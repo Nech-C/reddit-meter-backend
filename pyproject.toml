@@ -1,0 +1,10 @@
+[project]
+name="reddit-meter-backend"
+version="0.1.0"
+description="backend for my Reddit Meter backend project"
+requires-python="~=3.12"
+
+dependencies = [
+    "fastapi[all]>=0.115.13",
+    "uvicorn>=0.34.3",
+]
