@@ -1,0 +1,59 @@
+{
+  "News & Politics": [
+    "news", "worldnews", "politics", "nottheonion", "todayilearned",
+    "explainlikeimfive", "AskHistorians", "europe", "AskUK", "AskMen", "AskWomen"
+  ],
+  "Finance & Economics": [
+    "wallstreetbets", "personalfinance", "PersonalFinanceCanada", "Frugal",
+    "povertyfinance", "recruitinghell", "Scams", "crypto", "finance"
+  ],
+  "Education & Questions": [
+    "AskReddit", "NoStupidQuestions", "OutOfTheLoop", "TooAfraidToAsk",
+    "explainlikeimfive", "changemyview", "learnprogramming", "cscareerquestions"
+  ],
+  "Pop Culture & Entertainment": [
+    "movies", "television", "Fauxmoi", "popculturechat", "Kanye",
+    "marvelstudios", "TwoXChromosomes", "JoeRogan", "comics"
+  ],
+  "Gaming": [
+    "gaming", "pcgaming", "GlobalOffensive", "FortNiteBR", "leagueoflegends", "minecraft",
+    "Genshin_Impact", "Genshin_Impact_Leaks", "apexlegends", "pathofexile", "HonkaiStarRail",
+    "HonkaiStarRail_leaks", "Overwatch", "Eldenring", "Helldivers", "classicwow", "dota2",
+    "Tekken", "Warframe", "Destiny", "Steam", "SteamDeck", "Palworld", "2007scape",
+    "BG3Builds", "BaldursGate3", "cyberpunkgame", "RPClipsGTA", "VirtualYoutubers", "Hololive",
+    "Nijisanji", "Asmongold", "PERSoNA"
+  ],
+  "Tech & Programming": [
+    "technology", "techsupport", "selfhosted", "homelab", "nvidia", "apple",
+    "iphone", "ChatGPT", "StableDiffusion", "ProgrammerHumor", "sysadmin"
+  ],
+  "Data & Analytics": [
+    "dataisbeautiful", "thedatalist", "theydidthemath", "coolguides", "mapPorn"
+  ],
+  "Art & Creativity": [
+    "interestingasfuck", "Damnthatsinteresting", "mildlyinteresting", "BeAmazed",
+    "pics", "videos", "youtube", "Music", "books", "Cooking", "KitchenConfidential"
+  ],
+  "Memes & Humor": [
+    "memes", "dankmemes", "facepalm", "unexpected", "shitposting", "HolUp",
+    "ChatGPT", "TikTokCringe", "malelivingspace", "BoomersBeingFools",
+    "ImTheMainCharacter", "CleverComebacks", "PeterExplainsTheJoke", "ExplainTheJoke"
+  ],
+  "Mental Health & Self": [
+    "antiwork", "TrueOffMyChest", "relationship_advice", "AITAH", "AmItheAsshole",
+    "badroommates", "tifu", "TooAfraidToAsk", "teenagers"
+  ],
+  "Social & Cultural Commentary": [
+    "BlackPeopleTwitter", "WhitePeopleTwitter", "CasualUK", "Millennials", "GenZ", "SipsTea"
+  ],
+  "DIY, Science & Niche Interests": [
+    "DIY", "science", "MagicTCG", "feedthebeast", "StardewValley", "3Dprinting",
+    "snowboarding", "Truckers", "college", "travel", "geography", "LifeProTips"
+  ],
+  "Conflict & Reality": [
+    "PublicFreakout", "Wellthatsucks", "CombatFootage", "UkraineWarVideoReport", "CrazyFuckingVideos", "Warthunder"
+  ],
+  "NSFW & Fringe": [
+    "gonewildaudio", "Piracy", "PiratedGames", "CrackWatch", "hentai"
+  ]
+}
