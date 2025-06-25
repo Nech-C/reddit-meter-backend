@@ -8,7 +8,7 @@ import praw
 load_dotenv()
 
 SUBREDDITS_JSON_PATH = "./subreddits.json"
-SUBBREDDITS_BY_CATEGORY = json.load(open(SUBREDDITS_JSON_PATH, "r"))
+DEFAULT_SUBBREDDITS_BY_CATEGORY = json.load(open(SUBREDDITS_JSON_PATH, "r"))
 
 reddit = praw.Reddit(
     client_id=os.getenv("REDDIT_CLIENT_ID"),
@@ -20,7 +20,7 @@ reddit = praw.Reddit(
 
 
 def fetch_subreddit_posts(subreddit_name: str,
-                          method: str,
+                          method: str = 'hot',
                           required_posts: int = 15,
                           comment_limit: int = 5,
                           fetch_buffer: int = 100) -> list:
@@ -30,10 +30,10 @@ def fetch_subreddit_posts(subreddit_name: str,
 
     Args:
         subreddit_name (str): Subreddit to fetch from.
-        method (str): 'hot', 'new', or 'top'.
-        required_posts (int): Number of usable posts to return.
-        comment_limit (int): Minimum number of valid comments per post.
-        fetch_buffer (int): How many posts to sample total.
+        method (str): 'hot', 'new', or 'top'. Defaults to 'hot'.
+        required_posts (int): Number of usable posts to return. defaults to 15.
+        comment_limit (int): Minimum number of valid comments per post. Defaults to 5.
+        fetch_buffer (int): How many posts to sample total. Defaults to 100.
 
     Returns:
         list: List of filtered post dictionaries.
@@ -94,3 +94,25 @@ def fetch_subreddit_posts(subreddit_name: str,
             print(f"Error processing submission {submission.id}: {e}")
 
     return results
+
+
+def fetch_all_subreddit_posts_by_dict(sub_dict: dict = DEFAULT_SUBBREDDITS_BY_CATEGORY,
+                                      method: str = 'hot',
+                                      posts_per_subreddit: int = 15,
+                                      comment_per_post: int = 5,
+                                      fetch_buffer: int = 100
+                                      ) -> dict:
+    """
+    Fetch posts by subreddit dictionary.
+    Args:
+        sub_dict (dict): Dictionary of subreddit categories and their subreddits. Defaults to the loaded JSON from `subreddits.json`.
+            {
+                "subreddit category": [
+                    "subreddit1",
+                    "subreddit2",
+                    ...
+                ]
+            }
+        
+        method (str): 'hot', 'new', or 'top'.
+    """
