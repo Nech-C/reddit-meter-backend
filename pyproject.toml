@@ -10,5 +10,7 @@ dependencies = [
     "ipywidgets>=8.1.7",
     "praw>=7.8.1",
     "python-dotenv>=1.1.0",
+    "torch>=2.7.1",
+    "transformers>=4.52.4",
     "uvicorn>=0.34.3",
 ]
