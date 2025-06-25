@@ -9,15 +9,24 @@ load_dotenv()
 
 SUBREDDITS_JSON_PATH = "./subreddits.json"
 DEFAULT_SUBBREDDITS_BY_CATEGORY = json.load(open(SUBREDDITS_JSON_PATH, "r"))
+reddit = None
 
-reddit = praw.Reddit(
-    client_id=os.getenv("REDDIT_CLIENT_ID"),
-    client_secret=os.getenv("REDDIT_CLIENT_SECRET"),
-    password=os.getenv("REDDIT_PASSWORD"),
-    user_agent=os.getenv("REDDIT_USER_AGENT"),
-    username=os.getenv("REDDIT_USERNAME")
-)
-
+def initialize():
+    global reddit
+    reddit = praw.Reddit(
+        client_id=os.getenv("REDDIT_CLIENT_ID"),
+        client_secret=os.getenv("REDDIT_CLIENT_SECRET"),
+        password=os.getenv("REDDIT_PASSWORD"),
+        user_agent=os.getenv("REDDIT_USER_AGENT"),
+        username=os.getenv("REDDIT_USERNAME")
+    )
+    
+    # check if it's initialized
+    if reddit.user.me() != os.getenv("REDDIT_USERNAME"):
+        raise ValueError("Reddit API initialization failed. Check your credentials in .env file.")
+    print(f"Logged in as {reddit.user.me()}")
+    
+initialize()
 
 def fetch_subreddit_posts(subreddit_name: str,
                           method: str = 'hot',
@@ -48,19 +57,16 @@ def fetch_subreddit_posts(subreddit_name: str,
 
     for submission in fetch_method(limit=fetch_buffer):
         # Filter out image/empty posts
-        if (
-            submission.url.lower().endswith((".jpg", ".jpeg", ".png", ".gif", ".webp")) or
-            (hasattr(submission, "post_hint") and submission.post_hint == "image") or
-            not submission.selftext.strip()
-        ):
+        if not submission.selftext.strip():
             continue
 
         try:
-            submission.comments.replace_more(limit=1)
+            print(f"Processing submission: {submission.id} - {submission.title}")
+            submission.comments.replace_more(limit=5)
 
             valid_comments = []
             for comment in submission.comments:
-                if "http" in comment.body and any(ext in comment.body.lower() for ext in [".jpg", ".png", ".gif", ".webp", "i.redd.it", "imgur.com"]):
+                if not comment.body or not comment.body.strip():
                     continue
                 valid_comments.append({
                     'body': comment.body,
@@ -77,6 +83,7 @@ def fetch_subreddit_posts(subreddit_name: str,
             post_data = {
                 'id': submission.id,
                 'title': submission.title,
+                'text': submission.selftext,
                 'url': submission.url,
                 'score': submission.score,
                 'num_comments': submission.num_comments,
@@ -92,6 +99,10 @@ def fetch_subreddit_posts(subreddit_name: str,
 
         except Exception as e:
             print(f"Error processing submission {submission.id}: {e}")
+        
+    if collected < required_posts:
+        print(f"Warning: Only collected {collected}/{required_posts} posts after fetching {fetch_buffer}")
+
 
     return results
 
@@ -114,5 +125,29 @@ def fetch_all_subreddit_posts_by_dict(sub_dict: dict = DEFAULT_SUBBREDDITS_BY_CA
                 ]
             }
         
-        method (str): 'hot', 'new', or 'top'.
+        method (str): 'hot', 'new', or 'top'. Defaults to 'hot'.
+        posts_per_subreddit (int): Number of usable posts to return per subreddit. Defaults to 15.
+        comment_per_post (int): Minimum number of valid comments per post. Defaults to 5.
+        fetch_buffer (int): How many posts to sample total per subreddit. Defaults to 100.
+    Returns:
+        dict: Dictionary of subreddit names to lists of post dictionaries.
     """
+    
+    res = {}
+    for category, subreddits in sub_dict.items():
+        res[category] = []
+        for subreddit in subreddits:
+            subreddit_dict = {
+                'name': subreddit,
+                'posts': fetch_subreddit_posts(
+                    subreddit_name=subreddit,
+                    method=method,
+                    required_posts=posts_per_subreddit,
+                    comment_limit=comment_per_post,
+                    fetch_buffer=fetch_buffer
+                )
+            }
+            res[category].append(subreddit_dict)
+            print(f"Fetched {len(subreddit_dict['posts'])} posts from {subreddit} in category {category}")
+        print(f"Completed fetching category: {category} with {len(res[category])} subreddits.")
+    return res
