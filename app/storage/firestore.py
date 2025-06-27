@@ -35,11 +35,11 @@ def save_post_archive(posts: list[dict], timestamp: str = None):
     doc_id = dt.strftime("%Y%m%d%H")  # e.g., 2025062713
     doc_ref = db.collection("post_archive").document(doc_id)
 
-    for post in posts:
-        post["archived_at"] = dt.isoformat()
-        post["updatedAt"] = firestore.SERVER_TIMESTAMP
-
-    doc_ref.set({"posts": posts, "count": len(posts), "archived_at": dt.isoformat(), "updatedAt": firestore.SERVER_TIMESTAMP})
+    doc_ref.set({
+        "posts": posts,
+        "count": len(posts),
+        "archieved_at": dt.isoformat(),
+    })
     print(f"✅ Archived {len(posts)} posts to Firestore (post_archive/{doc_id})")
 
 

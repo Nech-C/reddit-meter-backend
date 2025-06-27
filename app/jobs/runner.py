@@ -59,9 +59,10 @@ def main(
         save_sentiment_summary(aggregated)
     if history:
         save_sentiment_history(aggregated)
-    if archive:
-        timestamp = datetime.now(timezone.utc).isoformat()
-        save_post_archive(all_posts, timestamp=timestamp)
+    # TODO: Uncomment when archive functionality is ready
+    # if archive:
+    #     timestamp = datetime.now(timezone.utc).isoformat()
+    #     save_post_archive(all_posts, timestamp=timestamp)
 
     print("✅ All steps completed.")
 
