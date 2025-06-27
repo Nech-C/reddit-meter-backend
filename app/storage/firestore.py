@@ -1,3 +1,4 @@
+# File: app/storage/firestore.py
 from datetime import datetime, timezone
 import os
 
@@ -23,25 +24,24 @@ def save_sentiment_summary(aggregated_sentiment: dict):
 
 def save_post_archive(posts: list[dict], timestamp: str = None):
     """
-    Save raw posts (with sentiment) to Firestore for archival.
-    Each post gets its own document in 'post_archive' collection.
+    Save all posts from one job into a single Firestore document.
+    Document name will be based on UTC timestamp: YYYYMMDDHH
 
     Args:
-        posts (list): List of full post dicts.
-        timestamp (str): When this batch was fetched. If None, use current UTC.
+        posts (list): List of post dicts (with sentiment).
+        timestamp (str): Optional ISO 8601 timestamp string.
     """
-    collection = db.collection("post_archive")
-    ts = timestamp or datetime.now(timezone.utc).isoformat()
+    dt = datetime.fromisoformat(timestamp) if timestamp else datetime.now(timezone.utc)
+    doc_id = dt.strftime("%Y%m%d%H")  # e.g., 2025062713
+    doc_ref = db.collection("post_archive").document(doc_id)
 
-    batch = db.batch()
     for post in posts:
-        doc_ref = collection.document(post["id"])
-        post["archived_at"] = ts
+        post["archived_at"] = dt.isoformat()
         post["updatedAt"] = firestore.SERVER_TIMESTAMP
-        batch.set(doc_ref, post)
 
-    batch.commit()
-    print(f"✅ Archived {len(posts)} posts to Firestore (post_archive/)")
+    doc_ref.set({"posts": posts, "count": len(posts), "archived_at": dt.isoformat(), "updatedAt": firestore.SERVER_TIMESTAMP})
+    print(f"✅ Archived {len(posts)} posts to Firestore (post_archive/{doc_id})")
+
 
 
 def save_sentiment_history(aggregated_sentiment: dict):
