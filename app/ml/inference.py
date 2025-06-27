@@ -1,3 +1,4 @@
+# File: app/ml/inference.py
 from transformers import pipeline
 
 classifier = pipeline(
