@@ -22,8 +22,8 @@ build-pipeline:
 test-pipeline:
 	docker run \
 		--env-file .env.test \
-		-v $(pwd)/creds.json:/app/creds.json \
-		-v $(pwd)/test_subreddits.json:/app/test_subreddits.json \
+		-v $(PWD)/creds.json:/app/creds.json \
+		-v $(PWD)/test_subreddits.json:/app/test_subreddits.json \
 		reddit-meter-pipeline \
 		make runner-test
 
@@ -33,3 +33,26 @@ push-pipeline:
 
 	docker push us-central1-docker.pkg.dev/reddit-sentiment-meter/reddit-meter/reddit-meter-pipeline
 
+
+build-api:
+	docker build --progress=plain -t reddit-meter-api -f Dockerfile.api .
+
+test-api:
+	docker run \
+		--env-file .env.test \
+		-v ${PWD}/creds.json:/reddit-meter-api/creds.json \
+		-p 8080:8080 \
+		reddit-meter-api \
+
+run-api:
+	docker run \
+		--env-file .env.dev \
+		-v ${PWD}/creds.json:/reddit-meter-api/creds.json \
+		-p 8080:8080 \
+		reddit-meter-api
+
+push-api:
+	docker tag reddit-meter-api \
+		us-central1-docker.pkg.dev/reddit-sentiment-meter/reddit-meter/reddit-meter-api
+
+	docker push us-central1-docker.pkg.dev/reddit-sentiment-meter/reddit-meter/reddit-meter-api

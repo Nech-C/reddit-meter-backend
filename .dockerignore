@@ -201,4 +201,4 @@ uv.lock
 
 # any .json files that contain "reddit-semtiment-meter"
 *reddit-sentiment-meter*
-
+creds.json
