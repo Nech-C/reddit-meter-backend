@@ -35,13 +35,14 @@ def save_post_archive(posts: list[dict], timestamp: str = None):
     doc_id = dt.strftime("%Y%m%d%H")  # e.g., 2025062713
     doc_ref = db.collection("post_archive").document(doc_id)
 
-    doc_ref.set({
-        "posts": posts,
-        "count": len(posts),
-        "archieved_at": dt.isoformat(),
-    })
+    doc_ref.set(
+        {
+            "posts": posts,
+            "count": len(posts),
+            "archieved_at": dt.isoformat(),
+        }
+    )
     print(f"✅ Archived {len(posts)} posts to Firestore (post_archive/{doc_id})")
-
 
 
 def save_sentiment_history(aggregated_sentiment: dict):
@@ -59,3 +60,13 @@ def save_sentiment_history(aggregated_sentiment: dict):
     print(
         f"✅ Saved sentiment history snapshot to Firestore (sentiment_history/{hour_key})"
     )
+
+
+def get_latest_sentiment():
+    """
+    Retrieve the latest snapshot from Firestore (sentiment_current/global).
+    """
+    doc = db.collection("sentiment_current").document("global").get()
+    if doc.exists:
+        return doc.to_dict()
+    return {"error": "No sentiment data found."}

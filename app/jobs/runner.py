@@ -1,13 +1,11 @@
 # file: app/jobs/runner.py
 import argparse
-from datetime import datetime, timezone
 
 from app.reddit.fetch import fetch_all_subreddit_posts_by_dict
 from app.ml.inference import run_batch_inference
 from app.processing.aggregate import compute_sentiment_average
 from app.storage.firestore import (
     save_sentiment_summary,
-    save_post_archive,
     save_sentiment_history,
 )
 
