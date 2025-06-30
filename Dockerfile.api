@@ -10,7 +10,9 @@ RUN uv pip install --system \
     fastapi[all] \
     uvicorn \
     python-dotenv \
-    google-cloud-firestore
+    google-cloud-firestore \
+    slowapi \
+    secure
 
 # Copy only your API code
 COPY app/api ./app/api

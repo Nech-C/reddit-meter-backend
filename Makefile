@@ -33,19 +33,23 @@ push-pipeline:
 
 	docker push us-central1-docker.pkg.dev/reddit-sentiment-meter/reddit-meter/reddit-meter-pipeline
 
+test-api-local:
+	PYTHONPATH=. uv run uvicorn app.api.main:app --host 0.0.0.0 --port 8080
 
 build-api:
 	docker build --progress=plain -t reddit-meter-api -f Dockerfile.api .
 
-test-api:
+test-api-image:
 	docker run \
+		--rm \
 		--env-file .env.test \
 		-v ${PWD}/creds.json:/reddit-meter-api/creds.json \
 		-p 8080:8080 \
 		reddit-meter-api \
 
-run-api:
+run-api-image:
 	docker run \
+		--rm \
 		--env-file .env.dev \
 		-v ${PWD}/creds.json:/reddit-meter-api/creds.json \
 		-p 8080:8080 \
