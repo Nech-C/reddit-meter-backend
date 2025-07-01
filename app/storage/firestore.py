@@ -1,12 +1,14 @@
 # File: app/storage/firestore.py
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 import os
 
 from dotenv import load_dotenv
 from google.cloud import firestore
 
+HISTORY_RETRIEVAL_LIMIT = (24/4) * 30 # 30 days, history taken every 4 hrs
 env_name = os.getenv("APP_ENV", "dev")
 load_dotenv(f".env.{env_name}")
+
 
 db = firestore.Client(database=os.getenv("FIRESTORE_DATABASE_ID"))
 
@@ -70,3 +72,20 @@ def get_latest_sentiment():
     if doc.exists:
         return doc.to_dict()
     return {"error": "No sentiment data found."}
+
+def get_recent_sentiment_history(num_days) -> list:
+    """Retrieve the sentiment history from Firestore (sentiment_history).
+
+    Args:
+        num_records (int): The number of data points to retrieve.
+    """
+    now = datetime.now(timezone.utc)
+    start_date = (now - timedelta(days=num_days)).isoformat()
+    
+    docs = (
+        db.collection("sentiment_history")
+        .where("timestamp", ">=", start_date)
+        .stream()
+    )
+    
+    return [doc.to_dict() for doc in docs]
