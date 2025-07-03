@@ -46,16 +46,19 @@ def read_root():
 def get_current_sentiment(request: Request):
     return get_latest_sentiment()
 
+
 @app.get("/sentiment/day")
 @app.state.limiter.limit("2/minute")
 def get_past_day_sentiment(request: Request):
     # TODO: make this a variable
     return get_recent_sentiment_history(1)
 
+
 @app.get("/sentiment/week")
 @app.state.limiter.limit("2/minute")
 def get_past_week_sentiment(request: Request):
     return get_recent_sentiment_history(7)
+
 
 @app.get("/sentiment/month")
 @app.state.limiter.limit("2/minute")
