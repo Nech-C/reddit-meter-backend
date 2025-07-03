@@ -2,7 +2,13 @@
   "News & Politics": [
     "news"
   ],
+  "Finance & Economics": [
+    "wallstreetbets"
+  ],
+  "Gaming": [
+    "gaming"
+  ],
   "NSFW & Fringe": [
-    "gonewildaudio", "Piracy"
+    "Piracy"
   ]
 }
