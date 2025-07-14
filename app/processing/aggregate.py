@@ -29,11 +29,13 @@ def compute_sentiment_average(posts: list[dict]) -> dict:
     # softmax
     temperature = 1.5  # Try tuning between 100–5000
 
-    filtered = [(i, max(p["score"], 0)) for i, p in enumerate(valid_posts) if p["score"] > 0]
+    filtered = [
+        (i, max(p["score"], 0)) for i, p in enumerate(valid_posts) if p["score"] > 0
+    ]
     indices, scores = zip(*filtered) if filtered else ([], [])
     scores = np.array(scores)
     weights = normalized_softmax(scores, temperature)
-    
+
     weighted_totals = defaultdict(float)
     top_contributors = defaultdict(list)
 
