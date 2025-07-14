@@ -5,11 +5,9 @@ runner-test:
 runner-dev:
 	APP_ENV=dev PYTHONPATH=. uv run python app/jobs/runner.py --method hot --posts 15 --comments 5
 
-# Format code
 format:
 	uv run black .
 
-# Lint code (optional)
 lint:
 	ruff check . --extend-exclude '*.ipynb'
 
