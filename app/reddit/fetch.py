@@ -1,6 +1,7 @@
 # File: app/reddit/fetch.py
 import json
 import os
+import time
 from datetime import datetime
 
 from dotenv import load_dotenv
@@ -22,7 +23,7 @@ def initialize():
         password=os.getenv("REDDIT_PASSWORD"),
         user_agent=os.getenv("REDDIT_USER_AGENT"),
         username=os.getenv("REDDIT_USERNAME"),
-        ratelimit_seconds=os.getenv("REDDIT_RATELIMIT_SECONDS", 600),
+        ratelimit_seconds=int(os.getenv("REDDIT_RATELIMIT_SECONDS", "600")),
     )
 
     # check if it's initialized
@@ -106,6 +107,7 @@ def fetch_subreddit_posts(
                     submission.created_utc
                 ).isoformat(),
                 "comments": valid_comments,
+                "subreddit": subreddit_name,
             }
 
             results.append(post_data)

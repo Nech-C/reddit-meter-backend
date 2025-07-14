@@ -1,5 +1,6 @@
 # file: app/jobs/runner.py
 import argparse
+from datetime import datetime, timezone
 
 from app.reddit.fetch import fetch_all_subreddit_posts_by_dict
 from app.ml.inference import run_batch_inference
@@ -7,6 +8,7 @@ from app.processing.aggregate import compute_sentiment_average
 from app.storage.firestore import (
     save_sentiment_summary,
     save_sentiment_history,
+    save_post_archive
 )
 
 
@@ -48,6 +50,12 @@ def main(
     predictions = run_batch_inference(texts)
     for i, post in enumerate(all_posts):
         post["sentiment"] = predictions[i]
+        post.update({
+            "timestamp": datetime.utcnow().isoformat(),
+            "source": "bert",
+            "subreddit": post.get("subreddit", "unknown"),
+            "text": post["title"] + " " + post["text"] + " " + " ".join(c["body"] for c in post["comments"]),
+        })
 
     # Step 3: Aggregate
     aggregated = compute_sentiment_average(all_posts)
@@ -57,10 +65,9 @@ def main(
         save_sentiment_summary(aggregated)
     if history:
         save_sentiment_history(aggregated)
-    # TODO: Uncomment when archive functionality is ready
-    # if archive:
-    #     timestamp = datetime.now(timezone.utc).isoformat()
-    #     save_post_archive(all_posts, timestamp=timestamp)
+    if archive:
+        timestamp = datetime.now(timezone.utc).isoformat()
+        save_post_archive(all_posts, timestamp=timestamp)
 
     print("✅ All steps completed.")
 
