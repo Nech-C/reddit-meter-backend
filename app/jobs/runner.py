@@ -8,28 +8,29 @@ from app.processing.aggregate import compute_sentiment_average
 from app.storage.firestore import (
     save_sentiment_summary,
     save_sentiment_history,
-    save_post_archive,
 )
+
+from app.storage.bucket import upload_json
 
 
 def main(
     method="hot",
-    posts=15,
-    comments=5,
+    num_posts=15,
+    num_comments=5,
     buffer=100,
     archive=True,
     snapshot=True,
     history=True,
 ):
     print(
-        f"🚀 Starting sentiment pipeline (method={method}, posts={posts}, comments={comments})"
+        f"🚀 Starting sentiment pipeline (method={method}, posts={num_posts}, comments={num_comments})"
     )
 
     # Step 1: Fetch
     raw_data = fetch_all_subreddit_posts_by_dict(
         method=method,
-        posts_per_subreddit=posts,
-        comment_per_post=comments,
+        posts_per_subreddit=num_posts,
+        comment_per_post=num_comments,
         fetch_buffer=buffer,
     )
 
@@ -73,7 +74,7 @@ def main(
         save_sentiment_history(aggregated)
     if archive:
         timestamp = datetime.now(timezone.utc).isoformat()
-        save_post_archive(all_posts, timestamp=timestamp)
+        upload_json(all_posts, timestamp)
 
     print("✅ All steps completed.")
 
@@ -111,8 +112,8 @@ if __name__ == "__main__":
 
     main(
         method=args.method,
-        posts=args.posts,
-        comments=args.comments,
+        num_posts=args.posts,
+        num_comments=args.comments,
         buffer=args.buffer,
         archive=not args.no_archive,
         snapshot=not args.no_snapshot,
