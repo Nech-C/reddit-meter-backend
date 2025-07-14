@@ -43,6 +43,7 @@ def fetch_subreddit_posts(
     required_posts: int = 15,
     comment_limit: int = 5,
     fetch_buffer: int = 100,
+    max_post_age_days: int = 7
 ) -> list:
     """
     Fetch up to `required_posts` valid posts, each with at least `comment_limit` valid comments.
@@ -54,7 +55,7 @@ def fetch_subreddit_posts(
         required_posts (int): Number of usable posts to return. defaults to 15.
         comment_limit (int): Minimum number of valid comments per post. Defaults to 5.
         fetch_buffer (int): How many posts to sample total. Defaults to 100.
-
+        max_post_age_days (int): 
     Returns:
         list: List of filtered post dictionaries.
     """
@@ -71,6 +72,10 @@ def fetch_subreddit_posts(
         if not submission.selftext.strip() and not submission.title.strip():
             continue
 
+        # skip old posts
+        cutoff = datetime.utcnow().timestamp() - max_post_age_days * 86400
+        if submission.created_utc < cutoff:
+            continue
         try:
             print(f"Processing submission: {submission.id} - {submission.title}")
             submission.comments.replace_more(limit=5)
