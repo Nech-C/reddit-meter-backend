@@ -1,6 +1,7 @@
 # File: app/reddit/fetch.py
 import json
 import os
+import time
 from datetime import datetime
 
 from dotenv import load_dotenv
@@ -161,6 +162,7 @@ def fetch_all_subreddit_posts_by_dict(
     for category, subreddits in sub_dict.items():
         res[category] = []
         for subreddit in subreddits:
+            time.sleep(1)
             subreddit_dict = {
                 "name": subreddit,
                 "posts": fetch_subreddit_posts(
