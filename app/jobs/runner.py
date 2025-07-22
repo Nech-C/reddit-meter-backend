@@ -53,7 +53,7 @@ def main(
         post["sentiment"] = predictions[i]
         post.update(
             {
-                "timestamp": datetime.utcnow().isoformat(),
+                "timestamp": datetime.now(timezone.utc).isoformat(),
                 "source": "bert",
                 "subreddit": post.get("subreddit", "unknown"),
                 "text": post["title"]
