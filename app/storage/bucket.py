@@ -22,9 +22,7 @@ def upload_json(json_data: Union[list, dict], blob_name: str, bucket_name: str =
         bucket_name = os.getenv("GOOGLE_BUCKET_NAME")
     bucket = client.bucket(bucket_name)
     blob = bucket.blob(blob_name)
-    print(json_data)
     json_str = json.dumps(json_data, indent=2)
-    print(json_str)
     blob.upload_from_string(json_str, content_type="application/json")
 
     print(f"✅ Uploaded JSON to gs://{bucket_name}/{blob_name}")
