@@ -104,7 +104,7 @@ def fetch_subreddit_posts(
                 "id": submission.id,
                 "title": submission.title,
                 "text": submission.selftext,
-                "url": submission.url,
+                "url": f"https://reddit.com{submission.permalink}",
                 "score": submission.score,
                 "num_comments": submission.num_comments,
                 "created_utc": submission.created_utc,
