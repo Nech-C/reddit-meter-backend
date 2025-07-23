@@ -1,5 +1,6 @@
 # file: app/jobs/runner.py
 import argparse
+import os
 from datetime import datetime, timezone
 
 from app.reddit.fetch import fetch_all_subreddit_posts_by_dict
@@ -56,11 +57,6 @@ def main(
                 "timestamp": datetime.now(timezone.utc).isoformat(),
                 "source": "bert",
                 "subreddit": post.get("subreddit", "unknown"),
-                "text": post["title"]
-                + " "
-                + post["text"]
-                + " "
-                + " ".join(c["body"] for c in post["comments"]),
             }
         )
 
@@ -68,7 +64,7 @@ def main(
     aggregated = compute_sentiment_average(all_posts)
 
     # Step 4: Store
-    if snapshot:
+    if snapshot and os.environ.get("APP_ENV") != "test":
         save_sentiment_summary(aggregated)
     if history:
         save_sentiment_history(aggregated)
