@@ -1,8 +1,9 @@
+# app/api/main.py
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from app.storage.firestore import get_latest_sentiment, get_recent_sentiment_history
 
-import secure  # <-- import the module
+import secure
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from slowapi import Limiter
@@ -12,7 +13,6 @@ from slowapi.middleware import SlowAPIMiddleware
 app = FastAPI()
 app.state.limiter = Limiter(key_func=get_remote_address)
 
-# CORS setup...
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
