@@ -84,6 +84,8 @@ def fetch_subreddit_posts(
             for comment in submission.comments:
                 if not comment.body or not comment.body.strip():
                     continue
+                if comment.author == "AutoModerator":
+                    continue
                 valid_comments.append(
                     {
                         "body": comment.body,
