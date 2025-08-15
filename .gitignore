@@ -206,3 +206,4 @@ creds.json:Zone.Identifier
 creds.json
 
 /app/llm_annotation/*.json
+/bucket_backup
