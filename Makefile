@@ -58,3 +58,13 @@ push-api:
 		us-central1-docker.pkg.dev/reddit-sentiment-meter/reddit-meter/reddit-meter-api
 
 	docker push us-central1-docker.pkg.dev/reddit-sentiment-meter/reddit-meter/reddit-meter-api
+
+hf_dataset:
+	APP_ENV=dev PYTHONPATH=. uv run python app/llm_annotation/upload_hf_dataset.py
+
+
+hf_dataset-test:
+	APP_ENV=test PYTHONPATH=. uv run python app/llm_annotation/upload_hf_dataset.py
+
+test:
+	PYTHONPATH=. uv run pytest --cov=app --cov-report=term-missing
