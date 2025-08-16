@@ -50,8 +50,7 @@ run-api-image:
 		--rm \
 		--env-file .env.dev \
 		-v ${PWD}/creds.json:/reddit-meter-api/creds.json \
-		-p 8080:8080 \
-		reddit-meter-api
+		-p 8080:8080 \		reddit-meter-api
 
 push-api:
 	docker tag reddit-meter-api \
@@ -65,6 +64,9 @@ hf_dataset:
 
 hf_dataset-test:
 	APP_ENV=test PYTHONPATH=. uv run python app/llm_annotation/upload_hf_dataset.py
+
+create_shards:
+	APP_ENV=dev PYTHONPATH=. uv run python app/llm_annotation/create_shards.py $(run_id) $(revision_id)
 
 test:
 	PYTHONPATH=. uv run pytest --cov=app --cov-report=term-missing
