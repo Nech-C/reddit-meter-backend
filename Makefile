@@ -68,5 +68,9 @@ hf_dataset-test:
 create_shards:
 	APP_ENV=dev PYTHONPATH=. uv run python app/llm_annotation/create_shards.py $(run_id) $(revision_id)
 
+install_dep_kaggle:
+	pip install -U bitsandbytes
+	pip install requirements/annot.txt
+
 test:
 	PYTHONPATH=. uv run pytest --cov=app --cov-report=term-missing
