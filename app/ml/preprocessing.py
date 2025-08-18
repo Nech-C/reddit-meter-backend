@@ -3,6 +3,8 @@ import re
 import html
 import unicodedata
 
+from typing import List
+
 
 def normalize_unicode(text: str) -> str:
     """Normalize unicode using NFKC form."""
@@ -73,4 +75,15 @@ def clean_text(
         text = remove_control_chars(text)
     if collapse_ws:
         text = collapse_whitespace(text)
+    return text
+
+
+def prepare_for_input(title: str, post_text: str, comments: List[str]):
+    title = clean_text(title)
+    post_text = clean_text(post_text)
+    comments = [clean_text(c) for c in comments]
+    text = f"""TITLE: {title}
+                POST: {post_text}
+                COMMENTS: {" | ".join(comments)}"""
+
     return text

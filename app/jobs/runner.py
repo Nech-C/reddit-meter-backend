@@ -12,6 +12,7 @@ from app.storage.firestore import (
 )
 
 from app.storage.bucket import upload_json
+from app.ml.preprocessing import prepare_for_input
 
 
 def main(
@@ -39,12 +40,11 @@ def main(
     all_posts = [
         post for cat in raw_data.values() for sub in cat for post in sub["posts"]
     ]
+
     texts = [
-        post["title"]
-        + " "
-        + post["text"]
-        + " "
-        + " ".join(c["body"] for c in post["comments"])
+        prepare_for_input(
+            post["title"], post["text"], [c["body"] for c in post["comments"]]
+        )
         for post in all_posts
     ]
 
@@ -54,8 +54,8 @@ def main(
         post["sentiment"] = predictions[i]
         post.update(
             {
-                "timestamp": datetime.now(timezone.utc).isoformat(),
-                "source": "bert",
+                "processing_timestamp": datetime.now(timezone.utc).isoformat(),
+                "sentiment_source_model": "bert",
                 "subreddit": post.get("subreddit", "unknown"),
             }
         )
