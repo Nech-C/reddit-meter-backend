@@ -164,11 +164,13 @@ def annotate_batch(
                 return_full_text=False,
                 batch_size=batch_size,
             )
+            print(output)
             outputs.extend(output)
         # [[{'generated_text': '{"joy": 1, "sadness": 2, "anger": 5, "fear": 3, "love": 1, "surprise": 6}'}],
         # [{'generated_text': '{"joy": 1, "sadness": 5, "anger": 10, "fear": 7, "love": 1, "surprise": 3}'}]]
+        print(outputs)
         outputs = [parse_json(output[0]["generated_text"]) for output in outputs]
-
+        print(outputs)
     out = list(zip(ids, outputs))
     return out
 
