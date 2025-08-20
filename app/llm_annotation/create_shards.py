@@ -19,6 +19,12 @@ def main():
     CHUNK_SIZE = getenv_int("CHUNK_SIZE", 256)
     ANN_MODEL_ID = getenv_str("MODEL_ID", "Qwen/Qwen2.5-7B-Instruct")
     FIRESTORE_DATABASE_ID = getenv_str("FIRESTORE_DATABASE_ID", None)
+    FIRESTORE_ANNO_COLLECTION = getenv_str(
+        "FIRESTORE_ANNO_COLLECTION_NAME", "annotation_runs"
+    )
+    FIRESTORE_ANNO_TASKS_SUBCOLLECTION = getenv_str(
+        "FIRESTORE_ANNO_TASKS_SUBCOLLECTION_NAME", "tasks"
+    )
     RUN_ID = input("Enter RUN_ID:")
     REVISION = input("Enter REVISION:")
 
@@ -31,7 +37,7 @@ def main():
     )
 
     db = firestore.Client(database=FIRESTORE_DATABASE_ID)
-    run_doc = db.collection("annotation_runs").document(RUN_ID)
+    run_doc = db.collection(FIRESTORE_ANNO_COLLECTION).document(RUN_ID)
 
     run_doc.set(
         {
@@ -46,7 +52,7 @@ def main():
         merge=True,
     )
 
-    tasks = run_doc.collection("tasks")
+    tasks = run_doc.collection(FIRESTORE_ANNO_TASKS_SUBCOLLECTION)
 
     batch = db.batch()
 

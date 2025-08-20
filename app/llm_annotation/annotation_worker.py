@@ -2,60 +2,75 @@
 import os
 import re
 import json
-from typing import List, Dict, Optional, Any
+import gc
+from datetime import datetime, timezone, timedelta
+from typing import List, Dict, Optional, Any, Tuple
 
+import torch
 from dotenv import load_dotenv
 from google.cloud import firestore, storage
-from transformers import AutoTokenizer, AutoModelForCausalLM, BitsAndBytesConfig
-import torch
+from transformers import (
+    AutoTokenizer,
+    AutoModelForCausalLM,
+    BitsAndBytesConfig,
+    pipeline,
+)
+from datasets import load_dataset
 
 from app.utils.utils import getenv_int, getenv_str, getenv_bool, get_dotenv_name
 from app.ml.preprocessing import prepare_for_input
 
 APP_ENV = get_dotenv_name()
+load_dotenv(get_dotenv_name())
 
 RUN_ID = getenv_str("RUN_ID")
 WORKER_ID = getenv_str("WORKER_ID", f"worker-{os.getpid()}")
 HF_TOKEN = getenv_str("HF_TOKEN")
-MODEL_ID = getenv_str("ANN_MODEL_ID", "Qwen/Qwen3-4B-Instruct-2507")
+ANN_MODEL_ID = getenv_str("ANN_MODEL_ID", "Qwen/Qwen3-4B-Instruct-2507")
 SOURCE_HF_REPO = getenv_str("SOURCE_REPO_ID", "Nech-C/reddit-sentiment")
-GCS_BUCKET = getenv_str("ANN_BUCKET")
-GCS_PREFIX = getenv_str("ANN_BUCKET_PREFIX", "annotations")
-LEASE_MIN = getenv_int("LEASE_MIN", "30")
-LOAD_4BT = getenv_bool("LOAD_4BT", True)
-MAX_PROMPT_LEN = 1024 # todo: change this line 
-MAX_NEW_TOK = 16 # TODO: change this line later
-
+GCS_BUCKET = getenv_str("ANNO_BUCKET")
+GCS_PREFIX = getenv_str("ANNO_BUCKET_PREFIX", "annotations")
+LEASE_MIN = getenv_int("LEASE_MIN", 30)
+LOAD_8BT = getenv_bool("LOAD_8BT", True)
+FIRESTORE_ANNO_COLLECTIONS = getenv_str(
+    "FIRESTORE_ANNO_COLLECTION_NAME", "annotation_runs"
+)
+FIRESTORE_TASKS_SUBCOLLECTIONS = getenv_str(
+    "FIRESTORE_ANNO_TASKS_SUBCOLLECTION_NAME", "tasks"
+)
+MAX_PROMPT_LEN = getenv_int("MAX_PROMPT_LEN", 1024)
+MAX_NEW_TOKENS = getenv_int("MAX_NEW_TOKENS", 16)
+CHUNK_SIZE = getenv_int("CHUNK_SIZE", 1024)
+BATCH_SIZE = getenv_int("BATCH_SIZE", 8)
 assert RUN_ID and GCS_BUCKET and HF_TOKEN, (
     "RUN_ID, GCS_BUCKET, and HF_TOKEN must be set"
 )
 
 
-db = firestore.client()
-run_ref = db.collection("annotation_runs").document(RUN_ID)
-tasks_ref = run_ref.collection("tasks")
-
-gcs = storage.Client()
-bucket = gcs.bucket(GCS_BUCKET)
-
-
-def load_llm(model_id: str):
-    tokenizer = AutoTokenizer.from_pretrained(model_id, use_auth_token=HF_TOKEN)
-    if LOAD_4BT:
+def load_pipeline(model_id: str):
+    tok = AutoTokenizer.from_pretrained(
+        ANN_MODEL_ID,
+        use_auth_token=HF_TOKEN,
+        padding_side="left",
+        model_max_length=MAX_PROMPT_LEN,
+    )
+    if LOAD_8BT:
         bnb_config = BitsAndBytesConfig(load_in_8bit=True)
         model = AutoModelForCausalLM.from_pretrained(
-            model_id,
-            quantization_config=bnb_config,
+            ANN_MODEL_ID,
             use_auth_token=HF_TOKEN,
+            quantization_config=bnb_config,
             device_map="auto",
-            trust_remote_code=True,
         )
     else:
         model = AutoModelForCausalLM.from_pretrained(
-            model_id, use_auth_token=HF_TOKEN, trust_remote_code=True, device_map="auto"
+            ANN_MODEL_ID,
+            use_auth_token=HF_TOKEN,
+            trust_remote_code=True,
+            device_map="auto",
         )
 
-    return tokenizer, model
+    return pipeline("text-generation", model=model, tokenizer=tok)
 
 
 def build_prompt(title: str, body: str, comments: List[str]):
@@ -76,7 +91,7 @@ def build_prompt(title: str, body: str, comments: List[str]):
 
 def parse_json(text: str) -> Optional[Dict[str, int]]:
     t = text.strip()
-    t = re.sub(r"^```(?:json)?|```$", "", t, flags=re.MULTILINE|re.IGNORECASE).strip()
+    t = re.sub(r"^```(?:json)?|```$", "", t, flags=re.MULTILINE | re.IGNORECASE).strip()
     m = re.search(r"\{.*\}", t, re.DOTALL)
     if not m:
         return None
@@ -91,37 +106,202 @@ def parse_json(text: str) -> Optional[Dict[str, int]]:
         return None
 
 
-def annotate_batch(rows: List[Dict[str, Any]], tok, pipeline) -> List[Dict[str, Any]]:
-    prompts = []
-    ids = []
-    for r in rows:
-        title = r.get("title") or ""
-        body = r.get("selftext") or r.get("text") or ""
-        comments_raw = r.get("comments") or []
-        comments = []
-        for c in comments_raw[:5]:
-            if isinstance(c, str):
-                comments.append(c)
-            elif isinstance(c, dict) and "body" in c:
-                comments.append(c["body"])
-        prompts.append(build_prompt(title, body, comments))
-        ids.append(r.get("id"))
+def safe_call(pipe, inputs, **kwargs):
+    try:
+        with torch.inference_mode():  # stricter than no_grad, no autograd state
+            return pipe(inputs, **kwargs)  # e.g., text-generation pipeline call
+    except torch.cuda.OutOfMemoryError:
+        # Clear as much as possible, then re-raise so caller can back off (smaller batch/length)
+        del inputs
+        gc.collect()
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+            torch.cuda.ipc_collect()  # helps with inter-process handles
+        raise
+    finally:
+        # Always drop references from this scope (even on success)
+        try:
+            del inputs
+        except NameError:
+            pass
+        gc.collect()
+        if torch.cuda.is_available():
+            torch.cuda.synchronize()
+            torch.cuda.empty_cache()
 
-    inputs = tok(
-        prompts, return_tensors="pt", truncation=True, max_length=MAX_PROMPT_LEN, pad_to
-    ).to(pipeline.device)
+
+def annotate_batch(
+    cols: Dict[List[Any]], pipeline, batch_size
+) -> List[Tuple[str, str]]:
+    """Annotate a batch of Reddit post + comments.
+
+    Args:
+        cols (Dict[List[Any]]): A dict of columns from huggingface dataset
+        pipeline (_type_): The text generation pipeline to use for annotation.
+
+    Returns:
+        List[Tuple[str, str]]: A list of tuples containing the post ID and the annotated JSON string.
+        examples: [
+            ('1mpauih','{"joy": 1, "sadness": 5, "anger": 10, "fear": 3, "love": 1, "surprise": 2}'),
+            ('1mp2r91','{"joy": 1, "sadness": 5, "anger": 10, "fear": 5, "love": 1, "surprise": 2}')
+            ]
+    """
+    prompts = []
+    ids = cols["id"]
+    for title, text, comments in zip(cols["title"], cols["text"], cols["comments"]):
+        comments = [comment["body"] for comment in comments]
+        prompts.append([build_prompt(title, text, comments)])
     with torch.inference_mode():
-        outputs = model.generate(
-            **inputs,
-            max_new_tokens=MAX_NEW_TOK,
-            do_sample=False,
-            temperature=0.0,
-            top_p=1.0,
-            pad_token_id=tok.eos_token_id,
-        )
-    texts = tok.batch_decode(outputs, skip_special_tokens=True)
-    out = []
-    for rid, t in zip(ids, texts):
-        obj = parse_json(t)
-        out.append({"post_id": rid, **(obj or {})})
+        outputs = []
+        for idx in range(0, len(prompts), batch_size):
+            output = safe_call(
+                pipeline,
+                prompts[idx : idx + batch_size],
+                max_new_tokens=MAX_NEW_TOKENS,
+                do_sample=False,
+                padding="max_length",
+                return_full_text=False,
+                batch_size=batch_size,
+            )
+            outputs.extend(output)
+        # [[{'generated_text': '{"joy": 1, "sadness": 2, "anger": 5, "fear": 3, "love": 1, "surprise": 6}'}],
+        # [{'generated_text': '{"joy": 1, "sadness": 5, "anger": 10, "fear": 7, "love": 1, "surprise": 3}'}]]
+        outputs = [parse_json(output[0]["generated_text"]) for output in outputs]
+
+    out = list(zip(ids, outputs))
     return out
+
+
+def lease_one(db: firestore.Client, tasks_ref) -> Optional[str]:
+    now = datetime.now(timezone.utc)
+    # Pull a small window to reduce conflicts
+    candidates = list(
+        tasks_ref.where("status", "in", ["PENDING", "IN_PROGRESS"])
+        .order_by("updated_at")
+        .limit(25)
+        .stream()
+    )
+    for snap in candidates:
+        d = snap.to_dict()
+        expired = (d.get("lease_expires_at") is None) or (d["lease_expires_at"] < now)
+        if d["status"] == "PENDING" or expired:
+
+            @firestore.transactional
+            def txn(tx):
+                s2 = snap.reference.get(transaction=tx)
+                d2 = s2.to_dict()
+                now2 = datetime.now(timezone.utc)
+                expired2 = (d2.get("lease_expires_at") is None) or (
+                    d2["lease_expires_at"] < now2
+                )
+                if d2["status"] == "PENDING" or expired2:
+                    tx.update(
+                        snap.reference,
+                        {
+                            "status": "IN_PROGRESS",
+                            "lease_owner": WORKER_ID,
+                            "lease_expires_at": now2 + timedelta(minutes=LEASE_MIN),
+                            "updated_at": now2,
+                            "attempts": d2.get("attempts", 0)
+                            + (1 if d2["status"] == "PENDING" else 0),
+                        },
+                    )
+                    return snap.reference.id
+                return None
+
+            res = txn(db.transaction())
+            if res:
+                return res
+    return None
+
+
+def heartbeat(tasks_ref, doc_id: str, inc_done: int = 0):
+    now = datetime.now(timezone.utc)
+    tasks_ref.document(doc_id).update(
+        {
+            "lease_owner": WORKER_ID,
+            "lease_expires_at": now + timedelta(minutes=LEASE_MIN),
+            "updated_at": now,
+            "chunk_done": firestore.Increment(inc_done),
+        }
+    )
+
+
+def mark_completed(tasks_ref, doc_id: str):
+    tasks_ref.document(doc_id).update(
+        {
+            "status": "COMPLETED",
+            "lease_owner": None,
+            "lease_expires_at": None,
+            "updated_at": datetime.now(timezone.utc),
+        }
+    )
+
+
+def _gcs_prefix(task_id):
+    return f"{GCS_PREFIX}/{RUN_ID}/{task_id}/{WORKER_ID}"
+
+
+def main():
+    while True:
+        load_dotenv(APP_ENV)
+        db = firestore.Client()
+        run_ref = db.collection(FIRESTORE_ANNO_COLLECTIONS).document(RUN_ID)
+        tasks_ref = run_ref.collection(FIRESTORE_TASKS_SUBCOLLECTIONS)
+        run_config = run_ref.get().to_dict()
+
+        shard_id = lease_one(db, tasks_ref)
+        if not shard_id:
+            print("[worker] no tasks available, exiting")
+            break
+        shard = tasks_ref.document(shard_id).get().to_dict()
+        start_idx = shard["start_idx"]
+        end_idx = shard["end_idx"]
+
+        # load dataset
+        ds = load_dataset(
+            SOURCE_HF_REPO, split=shard["split"], revision=run_config.get("revision")
+        )
+        pipe = load_pipeline(ANN_MODEL_ID)
+
+        gcs = storage.Client()
+        bucket = gcs.bucket(GCS_BUCKET)
+
+        # process in chunks
+        for idx in range(start_idx, end_idx + 1, CHUNK_SIZE):
+            hi = min(idx + CHUNK_SIZE - 1, end_idx)
+            chunk = ds[idx : hi + 1]
+            out = annotate_batch(chunk, pipe, BATCH_SIZE)
+            records = []
+            for pid, scores in out:
+                records.append(
+                    {
+                        "id": pid,
+                        "scores": scores
+                        or {
+                            "joy": 1,
+                            "sadness": 1,
+                            "anger": 1,
+                            "fear": 1,
+                            "love": 1,
+                            "surprise": 1,
+                        },
+                        "model_id": ANN_MODEL_ID,
+                        "run_id": RUN_ID,
+                        "worker_id": WORKER_ID,
+                    }
+                )
+            payload = "\n".join(json.dumps(r, ensure_ascii=False) for r in records)
+
+            blob_name = f"{_gcs_prefix(shard_id)}/chunk-{idx:07d}-{hi:07d}.jsonl"
+            blob = bucket.blob(blob_name)
+            blob.upload_from_string(payload, content_type="application/jsonl")
+
+            heartbeat(tasks_ref, shard_id, inc_done=(hi - idx + 1))
+
+        mark_completed(tasks_ref, shard_id)
+        print(f"[worker] shard {shard_id} done")
+
+
+if __name__ == "__main__":
+    main()
