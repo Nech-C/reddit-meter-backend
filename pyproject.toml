@@ -2,7 +2,7 @@
 name="reddit-meter-backend"
 version="0.1.0"
 description="backend for my Reddit Meter backend project"
-requires-python="~=3.12"
+requires-python=">=3.10"
 
 dependencies = [
     "black>=25.1.0",
