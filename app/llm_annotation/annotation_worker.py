@@ -246,7 +246,9 @@ def _gcs_prefix(task_id):
 def main():
     while True:
         load_dotenv(APP_ENV)
+        print("[worker] Initializing Firestore client")
         db = firestore.Client(database=FIRESTORE_DATABASE_ID)
+        print("[worker] Firestore client initialized")
         run_ref = db.collection(FIRESTORE_ANNO_COLLECTIONS).document(RUN_ID)
         tasks_ref = run_ref.collection(FIRESTORE_TASKS_SUBCOLLECTIONS)
         run_config = run_ref.get().to_dict()
@@ -262,13 +264,12 @@ def main():
 
         # load dataset
         ds = load_dataset(
-            SOURCE_HF_REPO, split=shard["split"], revision=run_config.get("revision")
+            SOURCE_HF_REPO, split="train", revision=run_config.get("revision")
         )
         pipe = load_pipeline(ANN_MODEL_ID)
 
         gcs = storage.Client()
         bucket = gcs.bucket(GCS_BUCKET)
-
         # process in chunks
         for idx in range(start_idx, end_idx + 1, CHUNK_SIZE):
             hi = min(idx + CHUNK_SIZE - 1, end_idx)
