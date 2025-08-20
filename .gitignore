@@ -207,3 +207,9 @@ creds.json
 
 /app/llm_annotation/*.json
 /bucket_backup
+test.ipynb
+annotation_worker.ipynb
+test.ipynb
+app/llm_annotation/continuous_training.ipynb
+test.ipynb
+app/ml/inference_perftest.py
