@@ -32,6 +32,7 @@ GCS_BUCKET = getenv_str("ANNO_BUCKET")
 GCS_PREFIX = getenv_str("ANNO_BUCKET_PREFIX", "annotations")
 LEASE_MIN = getenv_int("LEASE_MIN", 30)
 LOAD_8BT = getenv_bool("LOAD_8BT", True)
+FIRESTORE_DATABASE_ID = getenv_str("FIRESTORE_DATABASE_ID", "sentiment-db")
 FIRESTORE_ANNO_COLLECTIONS = getenv_str(
     "FIRESTORE_ANNO_COLLECTION_NAME", "annotation_runs"
 )
@@ -245,7 +246,7 @@ def _gcs_prefix(task_id):
 def main():
     while True:
         load_dotenv(APP_ENV)
-        db = firestore.Client()
+        db = firestore.Client(database=FIRESTORE_DATABASE_ID)
         run_ref = db.collection(FIRESTORE_ANNO_COLLECTIONS).document(RUN_ID)
         tasks_ref = run_ref.collection(FIRESTORE_TASKS_SUBCOLLECTIONS)
         run_config = run_ref.get().to_dict()
