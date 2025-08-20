@@ -283,15 +283,7 @@ def main():
                 records.append(
                     {
                         "id": pid,
-                        "scores": scores
-                        or {
-                            "joy": 1,
-                            "sadness": 1,
-                            "anger": 1,
-                            "fear": 1,
-                            "love": 1,
-                            "surprise": 1,
-                        },
+                        "scores": scores,
                         "model_id": ANN_MODEL_ID,
                         "run_id": RUN_ID,
                         "worker_id": WORKER_ID,
