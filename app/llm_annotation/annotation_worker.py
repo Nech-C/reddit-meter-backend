@@ -131,12 +131,12 @@ def safe_call(pipe, inputs, **kwargs):
 
 
 def annotate_batch(
-    cols: Dict[List[Any]], pipeline, batch_size
+    cols: Dict[str, List[Any]], pipeline, batch_size
 ) -> List[Tuple[str, str]]:
     """Annotate a batch of Reddit post + comments.
 
     Args:
-        cols (Dict[List[Any]]): A dict of columns from huggingface dataset
+        cols (Dict[str, List[Any]]): A dict of columns from huggingface dataset
         pipeline (_type_): The text generation pipeline to use for annotation.
 
     Returns:
