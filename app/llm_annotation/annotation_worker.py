@@ -75,7 +75,10 @@ def load_pipeline(model_id: str):
             device_map="auto",
         )
 
-    model.config._attn_implementation = "xformers"
+    print(f"Attention implementation: {model.config._attn_implementation}")
+    if model.config._attn_implementation != "sdpa":
+        model.config._attn_implementation = "sdpa"
+
     return pipeline("text-generation", model=model, tokenizer=tok)
 
 
