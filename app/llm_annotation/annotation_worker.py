@@ -55,20 +55,26 @@ def load_pipeline(model_id: str):
         padding_side="left",
         model_max_length=MAX_PROMPT_LEN,
     )
+
+    torch_dtype = torch.bfloat16 if torch.cuda.is_available() else torch.float16
     if LOAD_8BT:
         bnb_config = BitsAndBytesConfig(load_in_8bit=True)
         model = AutoModelForCausalLM.from_pretrained(
             ANN_MODEL_ID,
             use_auth_token=HF_TOKEN,
             quantization_config=bnb_config,
+            torch_dtype=torch_dtype,
             device_map="auto",
+            attn_implementation="flash_attention_2",
         )
     else:
         model = AutoModelForCausalLM.from_pretrained(
             ANN_MODEL_ID,
             use_auth_token=HF_TOKEN,
             trust_remote_code=True,
+            torch_dtype=torch_dtype,
             device_map="auto",
+            attn_implementation="flash_attention_2",
         )
 
     return pipeline("text-generation", model=model, tokenizer=tok)
@@ -160,14 +166,15 @@ def annotate_batch(
                 prompts[idx : idx + batch_size],
                 max_new_tokens=MAX_NEW_TOKENS,
                 do_sample=False,
-                padding="max_length",
+                padding=True,
                 return_full_text=False,
                 batch_size=batch_size,
             )
+            output = [parse_json(o[0]["generated_text"]) for o in output]
             outputs.extend(output)
+            del output
         # [[{'generated_text': '{"joy": 1, "sadness": 2, "anger": 5, "fear": 3, "love": 1, "surprise": 6}'}],
         # [{'generated_text': '{"joy": 1, "sadness": 5, "anger": 10, "fear": 7, "love": 1, "surprise": 3}'}]]
-        outputs = [parse_json(output[0]["generated_text"]) for output in outputs]
     out = list(zip(ids, outputs))
     return out
 
@@ -296,7 +303,10 @@ def main():
             blob.upload_from_string(payload, content_type="application/jsonl")
             print(f"[worker] uploaded chunk to {blob_name}")
             heartbeat(tasks_ref, shard_id, inc_done=len(records))
-
+            del chunk, out, records, payload
+            gc.collect()
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
         mark_completed(tasks_ref, shard_id)
         print(f"[worker] shard {shard_id} done")
 
