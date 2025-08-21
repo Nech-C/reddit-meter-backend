@@ -51,7 +51,7 @@ assert RUN_ID and GCS_BUCKET and HF_TOKEN, (
 def load_pipeline(model_id: str):
     tok = AutoTokenizer.from_pretrained(
         ANN_MODEL_ID,
-        use_auth_token=HF_TOKEN,
+        token=HF_TOKEN,
         padding_side="left",
         model_max_length=MAX_PROMPT_LEN,
     )
@@ -61,22 +61,21 @@ def load_pipeline(model_id: str):
         bnb_config = BitsAndBytesConfig(load_in_8bit=True)
         model = AutoModelForCausalLM.from_pretrained(
             ANN_MODEL_ID,
-            use_auth_token=HF_TOKEN,
+            token=HF_TOKEN,
             quantization_config=bnb_config,
             torch_dtype=torch_dtype,
             device_map="auto",
-            attn_implementation="flash_attention_2",
         )
     else:
         model = AutoModelForCausalLM.from_pretrained(
             ANN_MODEL_ID,
-            use_auth_token=HF_TOKEN,
+            token=HF_TOKEN,
             trust_remote_code=True,
             torch_dtype=torch_dtype,
             device_map="auto",
-            attn_implementation="flash_attention_2",
         )
 
+    model.config._attn_implementation = "xformers"
     return pipeline("text-generation", model=model, tokenizer=tok)
 
 
