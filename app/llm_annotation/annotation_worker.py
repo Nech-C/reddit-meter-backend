@@ -56,14 +56,12 @@ def load_pipeline(model_id: str):
         model_max_length=MAX_PROMPT_LEN,
     )
 
-    torch_dtype = torch.bfloat16 if torch.cuda.is_available() else torch.float16
     if LOAD_8BT:
         bnb_config = BitsAndBytesConfig(load_in_8bit=True)
         model = AutoModelForCausalLM.from_pretrained(
             ANN_MODEL_ID,
             token=HF_TOKEN,
             quantization_config=bnb_config,
-            torch_dtype=torch_dtype,
             device_map="auto",
         )
     else:
@@ -71,13 +69,15 @@ def load_pipeline(model_id: str):
             ANN_MODEL_ID,
             token=HF_TOKEN,
             trust_remote_code=True,
-            torch_dtype=torch_dtype,
             device_map="auto",
         )
 
     print(f"Attention implementation: {model.config._attn_implementation}")
     if model.config._attn_implementation != "sdpa":
         model.config._attn_implementation = "sdpa"
+
+    print(f"use_cache: {model.config.use_cache}")
+    model.config.use_cache = False
 
     return pipeline("text-generation", model=model, tokenizer=tok)
 
