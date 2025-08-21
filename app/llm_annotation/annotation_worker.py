@@ -262,6 +262,7 @@ def main():
         print(f"[worker] got shard {shard_id}")
         shard = tasks_ref.document(shard_id).get().to_dict()
         start_idx = shard["start_idx"]
+        chunks_done = shard.get("chunk_done", 0)
         end_idx = shard["end_idx"]
 
         # load dataset
@@ -273,7 +274,7 @@ def main():
         gcs = storage.Client()
         bucket = gcs.bucket(GCS_BUCKET)
         # process in chunks
-        for idx in range(start_idx, end_idx + 1, CHUNK_SIZE):
+        for idx in range(start_idx + chunks_done, end_idx + 1, CHUNK_SIZE):
             hi = min(idx + CHUNK_SIZE - 1, end_idx)
             print(f"[worker] processing chunk {idx} to {hi}")
             chunk = ds[idx : hi + 1]
@@ -297,7 +298,7 @@ def main():
             blob = bucket.blob(blob_name)
             blob.upload_from_string(payload, content_type="application/jsonl")
             print(f"[worker] uploaded chunk to {blob_name}")
-            heartbeat(tasks_ref, shard_id, inc_done=(hi - idx + 1))
+            heartbeat(tasks_ref, shard_id, inc_done=len(records))
 
         mark_completed(tasks_ref, shard_id)
         print(f"[worker] shard {shard_id} done")
