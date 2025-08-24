@@ -78,10 +78,20 @@ def clean_text(
     return text
 
 
-def prepare_for_input(title: str, post_text: str, comments: List[str]):
+def prepare_for_input(
+    title: str,
+    post_text: str,
+    comments: List[str],
+    post_limit: int = 1400,
+    comment_limit: int = 300,
+) -> str:
+    if not post_limit:
+        post_limit = len(post_text)
+    if not comment_limit:
+        comment_limit = len(comments)
     title = clean_text(title)
-    post_text = clean_text(post_text)
-    comments = [clean_text(c) for c in comments]
+    post_text = clean_text(post_text[:post_limit])
+    comments = [clean_text(c) for c in comments[:comment_limit]]
     text = f"""TITLE: {title}
                 POST: {post_text}
                 COMMENTS: {" | ".join(comments)}"""
