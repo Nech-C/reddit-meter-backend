@@ -1,0 +1,18 @@
+runtime: python313
+
+instance_class: F1
+
+entrypoint: uvicorn app.api.main:app --host 0.0.0.0 --port $PORT
+
+env_variables:
+  FIRESTORE_DATABASE_ID: sentiment-db
+  FIRESTORE_POST_ARCHIVE_COLLECTION_NAME: post_archive
+  FIRESTORE_SENTIMENT_HISTORY_COLLECTION_NAME: sentiment_history
+  FIRESTORE_CURRENT_SENTIMENT_COLLECTION_NAME: current_sentiment
+  APP_ENV: DEV
+
+service_account: reddit-sentiment-meter@appspot.gserviceaccount.com
+
+automatic_scaling:
+  min_instances: 1
+  max_instances: 2
