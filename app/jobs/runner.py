@@ -6,10 +6,7 @@ from datetime import datetime, timezone
 from app.reddit.fetch import fetch_all_subreddit_posts_by_dict
 from app.ml.inference import run_batch_inference
 from app.processing.aggregate import compute_sentiment_average
-from app.storage.firestore import (
-    save_sentiment_summary,
-    save_sentiment_history,
-)
+from app.storage.firestore import default_repo
 
 from app.storage.bucket import upload_json
 from app.ml.preprocessing import prepare_for_input
@@ -64,10 +61,11 @@ def main(
     aggregated = compute_sentiment_average(all_posts)
 
     # Step 4: Store
+    repo = default_repo()
     if snapshot and os.environ.get("APP_ENV") != "test":
-        save_sentiment_summary(aggregated)
+        repo.save_sentiment_summary(aggregated)
     if history:
-        save_sentiment_history(aggregated)
+        repo.save_sentiment_history(aggregated)
     if archive:
         timestamp = datetime.now(timezone.utc).isoformat()
         upload_json(all_posts, timestamp)

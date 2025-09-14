@@ -46,5 +46,32 @@ class AnnoWorkerSettings(BaseSettings):
 
 
 @lru_cache(maxsize=1)
-def get_settings() -> AnnoWorkerSettings:
+def get_annotation_worker_settings() -> AnnoWorkerSettings:
     return AnnoWorkerSettings()
+
+
+class StorageSettings(BaseSettings):
+    model_config = SettingsConfigDict(
+        env_file=env_file,
+        case_sensitive=True,
+        env_prefix="",
+        env_nested_delimiter="__",
+        secrets_dir=None,
+        extra="ignore",
+    )
+    POST_ARCHIVE_COLLECTION_NAME: str
+    SENTIMENT_HISTORY_COLLECTION_NAME: str
+    CURRENT_SENTIMENT_COLLECTION_NAME: str
+    HISTORY_RETRIEVAL_LIMIT: int = (24 / 4) * 30  # 30 days, history taken every 4 hrs
+    FIRESTORE_DATABASE_ID: str
+
+    @field_validator(
+        "POST_ARCHIVE_COLLECTION_NAME",
+        "SENTIMENT_HISTORY_COLLECTION_NAME",
+        "CURRENT_SENTIMENT_COLLECTION_NAME",
+        "FIRESTORE_DATABASE_ID",
+    )
+    def _require_non_empty(cls, v):
+        if not v:
+            raise ValueError("must be set and non-empty")
+        return v
