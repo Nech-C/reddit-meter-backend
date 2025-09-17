@@ -1,6 +1,7 @@
 # file: app/jobs/runner.py
 import argparse
 import os
+import logging
 from datetime import datetime, timezone
 
 from app.reddit.fetch import fetch_all_subreddit_posts_by_dict
@@ -8,8 +9,12 @@ from app.ml.inference import run_batch_inference
 from app.processing.aggregate import compute_sentiment_average
 from app.storage.firestore import default_repo
 
-from app.storage.bucket import upload_json
+from app.storage.bucket import default_bucket_repo
 from app.ml.preprocessing import prepare_for_input
+from app.logging_setup import setup_logging
+
+setup_logging()
+log = logging.getLogger("jobs.runner")
 
 
 def main(
@@ -21,7 +26,7 @@ def main(
     snapshot=True,
     history=True,
 ):
-    print(
+    log.info(
         f"🚀 Starting sentiment pipeline (method={method}, posts={num_posts}, comments={num_comments})"
     )
 
@@ -45,7 +50,7 @@ def main(
         for post in all_posts
     ]
 
-    print(f"🧠 Running inference on {len(texts)} posts...")
+    log.info(f"🧠 Running inference on {len(texts)} posts...")
     predictions = run_batch_inference(texts)
     for i, post in enumerate(all_posts):
         post["sentiment"] = predictions[i]
@@ -68,9 +73,9 @@ def main(
         repo.save_sentiment_history(aggregated)
     if archive:
         timestamp = datetime.now(timezone.utc).isoformat()
-        upload_json(all_posts, timestamp)
+        default_bucket_repo().upload_json(all_posts, timestamp)
 
-    print("✅ All steps completed.")
+    log.info("✅ All steps completed.")
 
 
 if __name__ == "__main__":

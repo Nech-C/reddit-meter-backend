@@ -5,16 +5,17 @@ from functools import lru_cache
 
 from google.cloud import firestore
 
-from app.config import StorageSettings
+from app.config import StorageSettings, get_storage_settings
+from app.logging_setup import setup_logging
 
-logging.basicConfig(level=logging.INFO)
+setup_logging()
 log = logging.getLogger("storage.firestore")
 
 
 class FirestoreRepo:
     def __init__(self, settings: StorageSettings, db: firestore.Client):
-        self.s = settings
-        self.db = db
+        self.s = settings if settings else get_storage_settings()
+        self.db = db if db else firestore.Client(database=self.s.FIRESTORE_DATABASE_ID)
 
     def save_sentiment_summary(self, aggregated_sentiment: dict):
         """
@@ -26,7 +27,7 @@ class FirestoreRepo:
         aggregated_sentiment["timestamp"] = datetime.now(timezone.utc).isoformat()
         aggregated_sentiment["updatedAt"] = firestore.SERVER_TIMESTAMP
         doc_ref.set(aggregated_sentiment)
-        print("✅ Saved sentiment snapshot to Firestore.")
+        log.info("✅ Saved sentiment snapshot to Firestore.")
 
     def save_post_archive(self, posts: list[dict], timestamp: str = None):
         """
@@ -55,7 +56,7 @@ class FirestoreRepo:
                 "archieved_at": dt.isoformat(),
             }
         )
-        print(f"✅ Archived {len(posts)} posts to Firestore (post_archive/{doc_id})")
+        log.info(f"✅ Archived {len(posts)} posts to Firestore (post_archive/{doc_id})")
 
     def save_sentiment_history(self, aggregated_sentiment: dict):
         """
@@ -73,7 +74,7 @@ class FirestoreRepo:
         aggregated_sentiment["updatedAt"] = firestore.SERVER_TIMESTAMP
 
         doc_ref.set(aggregated_sentiment)
-        print(
+        log.info(
             f"✅ Saved sentiment history snapshot to Firestore (sentiment_history/{hour_key})"
         )
 
@@ -110,6 +111,4 @@ class FirestoreRepo:
 
 @lru_cache(maxsize=1)
 def default_repo() -> FirestoreRepo:
-    s = StorageSettings()
-    db = firestore.Client(database=s.FIRESTORE_DATABASE_ID)
-    return FirestoreRepo(s, db)
+    return FirestoreRepo()

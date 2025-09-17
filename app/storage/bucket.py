@@ -1,28 +1,43 @@
 import os
 import json
+import logging
 from typing import Union
+from functools import lru_cache
+
 from google.cloud import storage
-from dotenv import load_dotenv
 
-env_name = os.getenv("APP_ENV", "dev")
-load_dotenv(f".env.{env_name}")
+from app.logging_setup import setup_logging
+from app.config import StorageSettings, get_storage_settings
 
-client = storage.Client()
+setup_logging()
+log = logging.getLogger("storage.bucket")
 
 
-def upload_json(json_data: Union[list, dict], blob_name: str, bucket_name: str = None):
-    """Upload a JSON file to GCS
+class BucketRepo:
+    def __init__(self, settings: StorageSettings, client: storage.Client):
+        self.s = settings if settings else get_storage_settings()
+        self.client = client if client else storage.Client()
 
-    Args:
-        json_data (dict|list): Json object to upload
-        blob_name (str): path in the bucket
-        bucket_name (str): GCS bucket name
-    """
-    if bucket_name is None:
-        bucket_name = os.getenv("GOOGLE_BUCKET_NAME")
-    bucket = client.bucket(bucket_name)
-    blob = bucket.blob(blob_name)
-    json_str = json.dumps(json_data, indent=2)
-    blob.upload_from_string(json_str, content_type="application/json")
+    def upload_json(
+        self, json_data: Union[list, dict], blob_name: str, bucket_name: str = None
+    ):
+        """Upload a JSON file to GCS
 
-    print(f"✅ Uploaded JSON to gs://{bucket_name}/{blob_name}")
+        Args:
+            json_data (dict|list): Json object to upload
+            blob_name (str): path in the bucket
+            bucket_name (str): GCS bucket name
+        """
+        if bucket_name is None:
+            bucket_name = os.getenv("GOOGLE_BUCKET_NAME")
+        bucket = self.client.bucket(bucket_name)
+        blob = bucket.blob(blob_name)
+        json_str = json.dumps(json_data, indent=2)
+        blob.upload_from_string(json_str, content_type="application/json")
+
+        print(f"✅ Uploaded JSON to gs://{bucket_name}/{blob_name}")
+
+
+@lru_cache(maxsize=1)
+def default_bucket_repo() -> BucketRepo:
+    return BucketRepo()

@@ -19,9 +19,10 @@ from datasets import load_dataset
 
 from app.ml.preprocessing import prepare_for_input
 from app.config import AnnoWorkerSettings
+from app.logging_setup import setup_logging
 
+setup_logging()
 settings = AnnoWorkerSettings()
-logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 log = logging.getLogger("annotation_worker")
 metrics = Counter()
 

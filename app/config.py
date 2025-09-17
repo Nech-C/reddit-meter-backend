@@ -51,6 +51,18 @@ def get_annotation_worker_settings() -> AnnoWorkerSettings:
 
 
 class StorageSettings(BaseSettings):
+    """Storage settings for Firestore and GCS.
+
+    Args:
+        BaseSettings (Pydantic BaseSettings class): Base class for settings management.
+
+    Raises:
+        ValueError: if any required field is empty.
+
+    Returns:
+        StorageSettings: An instance of StorageSettings with loaded configuration.
+    """
+
     model_config = SettingsConfigDict(
         env_file=env_file,
         case_sensitive=True,
@@ -64,14 +76,26 @@ class StorageSettings(BaseSettings):
     CURRENT_SENTIMENT_COLLECTION_NAME: str
     HISTORY_RETRIEVAL_LIMIT: int = (24 / 4) * 30  # 30 days, history taken every 4 hrs
     FIRESTORE_DATABASE_ID: str
+    GOOGLE_BUCKET_NAME: str
 
     @field_validator(
         "POST_ARCHIVE_COLLECTION_NAME",
         "SENTIMENT_HISTORY_COLLECTION_NAME",
         "CURRENT_SENTIMENT_COLLECTION_NAME",
         "FIRESTORE_DATABASE_ID",
+        "GOOGLE_BUCKET_NAME",
     )
     def _require_non_empty(cls, v):
         if not v:
             raise ValueError("must be set and non-empty")
         return v
+
+
+@lru_cache(maxsize=1)
+def get_storage_settings() -> StorageSettings:
+    """Get storage settings with caching.
+
+    Returns:
+        StorageSettings: An instance of StorageSettings with loaded configuration.
+    """
+    return StorageSettings()
