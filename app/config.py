@@ -54,7 +54,7 @@ class StorageSettings(BaseSettings):
     """Storage settings for Firestore and GCS.
 
     Args:
-        BaseSettings (Pydantic BaseSettings class): Base class for settings management.
+        BaseSettings (BaseSettings): Base class for settings management.
 
     Raises:
         ValueError: if any required field is empty.
@@ -99,3 +99,33 @@ def get_storage_settings() -> StorageSettings:
         StorageSettings: An instance of StorageSettings with loaded configuration.
     """
     return StorageSettings()
+
+
+class InferenceSettings(BaseSettings):
+    """Settings for model inference.
+
+    Args:
+        BaseSettings (BaseSettings): Base class for settings management.
+    """
+
+    model_config = SettingsConfigDict(
+        env_file=env_file,
+        case_sensitive=True,
+        env_prefix="",
+        env_nested_delimiter="__",
+        secrets_dir=None,
+        extra="ignore",
+    )
+
+    BATCH_MAX_TOKENS: int = 512
+    SENTIMENT_MODEL_ID: str = "bhadresh-savani/distilbert-base-uncased-emotion"
+
+
+@lru_cache(maxsize=1)
+def get_inference_settings() -> InferenceSettings:
+    """Get inference settings with caching.
+
+    Returns:
+        InferenceSettings: An instance of InferenceSettings with loaded configuration.
+    """
+    return InferenceSettings()

@@ -1,14 +1,26 @@
 # File: app/ml/inference.py
 import os
+from functools import lru_cache
 
 from transformers import pipeline
 
-BERT_MAX_TOKEN = 512
-classifier = pipeline(
-    "text-classification",
-    model="bhadresh-savani/distilbert-base-uncased-emotion",
-    top_k=None,
-)
+from app.config import get_inference_settings
+
+settings = get_inference_settings()
+
+
+@lru_cache()
+def get_classifier():
+    """Get sentiment analysis pipeine with caching.
+
+    Returns:
+        Pipeline: a text-classification pipeline for sentiment analysis.
+    """
+    return pipeline(
+        "text-classification",
+        model=settings.SENTIMENT_MODEL_ID,
+        top_k=None,
+    )
 
 
 def run_batch_inference(texts: list[str], batch_size: int = 32) -> list[dict]:
@@ -17,8 +29,8 @@ def run_batch_inference(texts: list[str], batch_size: int = 32) -> list[dict]:
         batch = texts[i : i + batch_size]
         if os.getenv("APP_ENV") == "test":
             print(f"batch: {batch}")
-        truncated = [text[:BERT_MAX_TOKEN] for text in batch]
-        results = classifier(truncated)
+        truncated = [text[: settings.BERT_MAX_TOKEN] for text in batch]
+        results = get_classifier()(truncated)
 
         all_results.extend([{res["label"]: res["score"] for res in r} for r in results])
 
