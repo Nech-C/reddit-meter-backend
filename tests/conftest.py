@@ -1,4 +1,9 @@
+# File: tests/conftest.py
 import pytest
+from unittest.mock import MagicMock
+from fastapi.testclient import TestClient
+
+from app.storage.firestore import FirestoreRepo
 
 
 @pytest.fixture
@@ -95,3 +100,49 @@ def sample_posts():
         },
     ]
     return posts
+
+
+class DummyStorageSettings:
+    CURRENT_SENTIMENT_COLLECTION_NAME = "sentiment_current"
+    SENTIMENT_HISTORY_COLLECTION_NAME = "sentiment_history"
+    POST_ARCHIVE_COLLECTION_NAME = "post_archive"
+    FIRESTORE_DATABASE_ID = "fake-db"
+    GOOGLE_BUCKET_NAME = "test-bucket"
+
+
+@pytest.fixture
+def mock_db():
+    db = MagicMock(name="firestore.Client")
+    collection = MagicMock(name="CollectionRef")
+    document = MagicMock(name="DocumentRef")
+
+    db.collection.return_value = collection
+    collection.document.return_value = document
+
+    return db
+
+
+@pytest.fixture
+def firestore_repo(mock_db):
+    return FirestoreRepo(settings=DummyStorageSettings(), db=mock_db)
+
+
+@pytest.fixture
+def client(monkeypatch):
+    """
+    Fixture that yields a TestClient with FirestoreRepo dependency overridden.
+    All API routes that use Depends(get_repo) will receive a MagicMock instead.
+    """
+    from app.api import main
+
+    fake_repo = MagicMock(spec=FirestoreRepo)
+
+    # Override FastAPI dependency injection
+    main.app.dependency_overrides[main.get_repo] = lambda: fake_repo
+
+    with TestClient(main.app) as test_client:
+        # expose both client and fake_repo
+        yield test_client, fake_repo
+
+    # cleanup overrides after test
+    main.app.dependency_overrides.clear()

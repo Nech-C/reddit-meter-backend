@@ -1,36 +1,25 @@
-from fastapi.testclient import TestClient
-from unittest.mock import patch
-
-from app.api.main import app
-
-app = TestClient(app)
+import pytest
 
 
-def test_read_root():
-    response = app.get("/")
+def test_read_root(client):
+    test_client, _ = client
+    response = test_client.get("/")
     assert response.status_code == 200
     assert response.json() == {"message": "Hello, World!"}
 
 
-@patch("app.api.main.get_latest_sentiment")
-def test_current_sentiment(mock_get_latest):
-    mock_get_latest.return_value = {
-        "love": 0.02,
-        "anger": 0.27,
-        "sadness": 0.13,
-        "joy": 0.43,
-        "timestamp": "2025-07-25T01:40:48.024915+00:00",
-        "surprise": 0.05,
-    }
+def test_current_sentiment(client):
+    test_client, fake_repo = client
+    fake_repo.get_latest_sentiment.return_value = {"joy": 0.6}
 
-    response = app.get("/sentiment/current")
+    response = test_client.get("/sentiment/current")
     assert response.status_code == 200
-    assert response.json() == mock_get_latest.return_value
+    assert response.json() == {"joy": 0.6}
 
 
-@patch("app.api.main.get_recent_sentiment_history")
-def test_get_past_day_sentiment(mock_get_past_day):
-    mock_get_past_day.return_value = [
+def test_get_past_day_sentiment(client):
+    test_client, fake_repo = client
+    fake_repo.get_recent_sentiment_history.return_value = [
         {
             "love": 0.02,
             "anger": 0.27,
@@ -49,32 +38,16 @@ def test_get_past_day_sentiment(mock_get_past_day):
         },
     ]
 
-    response = app.get("/sentiment/day")
+    response = test_client.get("/sentiment/day")
 
     assert response.status_code == 200
-    assert response.json() == [
-        {
-            "love": 0.02,
-            "anger": 0.27,
-            "sadness": 0.13,
-            "joy": 0.43,
-            "timestamp": "2025-07-25T01:40:48.024915+00:00",
-            "surprise": 0.05,
-        },
-        {
-            "love": 0.02,
-            "anger": 0.27,
-            "sadness": 0.13,
-            "joy": 0.43,
-            "timestamp": "2025-07-25T03:40:48.024915+00:00",
-            "surprise": 0.05,
-        },
-    ]
+    assert response.json() == fake_repo.get_recent_sentiment_history.return_value
+    fake_repo.get_recent_sentiment_history.assert_called_once_with(1)
 
 
-@patch("app.api.main.get_recent_sentiment_history")
-def test_get_past_week_sentiment(mock_get_week):
-    mock_get_week.return_value = [
+def test_get_past_week_sentiment(client):
+    test_client, fake_repo = client
+    fake_repo.get_recent_sentiment_history.return_value = [
         {
             "love": 0.1,
             "anger": 0.2,
@@ -93,14 +66,15 @@ def test_get_past_week_sentiment(mock_get_week):
         },
     ]
 
-    response = app.get("/sentiment/week")
+    response = test_client.get("/sentiment/week")
     assert response.status_code == 200
-    assert response.json() == mock_get_week.return_value
+    assert response.json() == fake_repo.get_recent_sentiment_history.return_value
+    fake_repo.get_recent_sentiment_history.assert_called_once_with(7)
 
 
-@patch("app.api.main.get_recent_sentiment_history")
-def test_get_past_month_sentiment(mock_get_month):
-    mock_get_month.return_value = [
+def test_get_past_month_sentiment(client):
+    test_client, fake_repo = client
+    fake_repo.get_recent_sentiment_history.return_value = [
         {
             "love": 0.05,
             "anger": 0.3,
@@ -119,6 +93,53 @@ def test_get_past_month_sentiment(mock_get_month):
         },
     ]
 
-    response = app.get("/sentiment/month")
+    response = test_client.get("/sentiment/month")
     assert response.status_code == 200
-    assert response.json() == mock_get_month.return_value
+    assert response.json() == fake_repo.get_recent_sentiment_history.return_value
+    fake_repo.get_recent_sentiment_history.assert_called_once_with(31)
+
+
+class FakeRepoOK:
+    def healthcheck(self):
+        pass
+
+
+class FakeRepoFail:
+    def healthcheck(self):
+        raise RuntimeError("!")
+
+
+def test_warmup(client):
+    test_client, _ = client
+    from app.api.main import app, get_repo
+
+    app.dependency_overrides[get_repo] = FakeRepoOK
+
+    response = test_client.get("/_ah/warmup")
+    assert response.status_code == 200
+    assert response.json()["status"] == "ok"
+
+
+def test_warmup_failure(client):
+    test_client, _ = client
+
+    from app.api.main import app, get_repo
+
+    app.dependency_overrides[get_repo] = FakeRepoFail
+
+    resp = test_client.get("/_ah/warmup")
+    assert resp.status_code == 200
+    assert resp.json()["status"] == "degraded"
+    assert "error" in resp.json()
+
+
+@pytest.mark.parametrize("i", range(11))
+def test_rate_limit(client, i):
+    test_client, fake_repo = client
+    fake_repo.get_latest_sentiment.return_value = {"joy": 0.8}
+
+    resp = test_client.get("/sentiment/current")
+    if i < 9:
+        assert resp.status_code == 200
+    else:
+        assert resp.status_code == 429
