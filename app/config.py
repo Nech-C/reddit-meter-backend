@@ -66,7 +66,7 @@ class StorageSettings(BaseSettings):
     model_config = SettingsConfigDict(
         env_file=env_file,
         case_sensitive=True,
-        env_prefix="",
+        env_prefix="FIRESTORE_",
         env_nested_delimiter="__",
         secrets_dir=None,
         extra="ignore",
