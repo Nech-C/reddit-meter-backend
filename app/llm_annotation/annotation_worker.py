@@ -6,6 +6,7 @@ import json
 from collections import Counter
 from datetime import datetime, timezone, timedelta
 from typing import List, Dict, Optional, Any, Tuple
+from functools import lru_cache
 
 import torch
 from google.cloud import firestore, storage
@@ -22,9 +23,13 @@ from app.config import AnnoWorkerSettings
 from app.logging_setup import setup_logging
 
 setup_logging()
-settings = AnnoWorkerSettings()
 log = logging.getLogger("annotation_worker")
 metrics = Counter()
+
+
+@lru_cache(maxsize=1)
+def get_settings():
+    return AnnoWorkerSettings()
 
 
 def load_pipeline(model_id: str, settings: AnnoWorkerSettings):
@@ -137,7 +142,7 @@ def generate_with_adaptive_bs(
 
 
 def annotate_batch(
-    dataset: Dict[str, List[Any]], pipeline, batch_size
+    settings: AnnoWorkerSettings, dataset: Dict[str, List[Any]], pipeline, batch_size
 ) -> List[Tuple[str, str]]:
     """Annotate a batch of Reddit post + comments.
 
@@ -170,7 +175,11 @@ def annotate_batch(
     return out
 
 
-def lease_one(db: firestore.Client, tasks_ref) -> Optional[str]:
+def lease_one(
+    settings: AnnoWorkerSettings,
+    db: firestore.Client,
+    tasks_ref: firestore.DocumentReference,
+) -> Optional[str]:
     now = datetime.now(timezone.utc)
     # Pull a small window to reduce conflicts
     candidates = list(
@@ -214,7 +223,7 @@ def lease_one(db: firestore.Client, tasks_ref) -> Optional[str]:
     return None
 
 
-def heartbeat(tasks_ref, doc_id: str, inc_done: int = 0):
+def heartbeat(settings: AnnoWorkerSettings, tasks_ref, doc_id: str, inc_done: int = 0):
     now = datetime.now(timezone.utc)
     tasks_ref.document(doc_id).update(
         {
@@ -237,12 +246,22 @@ def mark_completed(tasks_ref, doc_id: str):
     )
 
 
-def _gcs_prefix(task_id):
-    return f"{settings.GCS_PREFIX}/{settings.RUN_ID}/{task_id}/{settings.WORKER_ID}"
+def _gcs_prefix(settings: AnnoWorkerSettings, shard_id: str) -> str:
+    """Get the gcs prefix for the current task and worder
+
+    Args:
+        settings (AnnoWorkerSettings): Settings for the current job
+        shard_id (str): The job shard id
+
+    Returns:
+        str: Prefix string of the target gcs bucket
+    """
+    return f"{settings.GCS_PREFIX}/{settings.RUN_ID}/{shard_id}/{settings.WORKER_ID}"
 
 
 def main():
     torch_bootstrap()
+    settings = get_settings()
     db = firestore.Client(database=settings.FIRESTORE_DATABASE_ID)
     run_ref = db.collection(settings.FIRESTORE_ANNO_COLLECTIONS).document(
         settings.RUN_ID
@@ -260,7 +279,7 @@ def main():
     while True:
         log.info("[worker] Initializing Firestore client")
         log.info("[worker] Firestore client initialized")
-        shard_id = lease_one(db, tasks_ref)
+        shard_id = lease_one(settings, db, tasks_ref)
         if not shard_id:
             log.critical("[worker] no tasks available, exiting")
             break
@@ -276,7 +295,7 @@ def main():
             log.info(f"[worker] processing chunk {idx} to {hi}")
             chunk = ds[idx : hi + 1]
             log.info(f"[worker] chunk size: {len(chunk)}")
-            out = annotate_batch(chunk, pipe, settings.BATCH_SIZE)
+            out = annotate_batch(settings, chunk, pipe, settings.BATCH_SIZE)
             log.info(f"[worker] annotated {len(out)} items")
             records = []
             for pid, scores in out:
@@ -292,13 +311,15 @@ def main():
             metrics["items_annotated"] += len(records)
             payload = "\n".join(json.dumps(r, ensure_ascii=False) for r in records)
 
-            blob_name = f"{_gcs_prefix(shard_id)}/chunk-{idx:07d}-{hi:07d}.jsonl"
+            blob_name = (
+                f"{_gcs_prefix(settings, shard_id)}/chunk-{idx:07d}-{hi:07d}.jsonl"
+            )
             blob = bucket.blob(blob_name)
             blob.upload_from_string(
                 payload, content_type="application/jsonl", if_generation_match=0
             )
             log.info(f"[worker] uploaded chunk to {blob_name}")
-            heartbeat(tasks_ref, shard_id, inc_done=len(records))
+            heartbeat(settings, tasks_ref, shard_id, inc_done=len(records))
             del chunk, out, records, payload
             gc.collect()
             if torch.cuda.is_available():
