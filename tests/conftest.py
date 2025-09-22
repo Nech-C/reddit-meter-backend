@@ -1,4 +1,14 @@
 # File: tests/conftest.py
+import sys
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
+VER = f"python{sys.version_info.major}.{sys.version_info.minor}"
+VENVP = ROOT / ".venv" / "lib" / VER / "site-packages"
+if VENVP.exists():
+    sys.path.insert(0, str(VENVP))
+
 import pytest
 from unittest.mock import MagicMock
 
