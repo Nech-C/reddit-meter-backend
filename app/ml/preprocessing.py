@@ -38,6 +38,7 @@ def decode_html_entities(text: str) -> str:
 
 def strip_nonbreaking_spaces(text: str) -> str:
     """Convert non-breaking spaces (U+00A0) to normal space."""
+    text = re.sub(r"[\x00-\x1f\x7f]", "", text)
     return text.replace("\xa0", " ")
 
 
