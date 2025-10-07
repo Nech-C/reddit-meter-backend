@@ -38,12 +38,12 @@ def decode_html_entities(text: str) -> str:
 
 def strip_nonbreaking_spaces(text: str) -> str:
     """Convert non-breaking spaces (U+00A0) to normal space."""
-    text = re.sub(r"[\x00-\x1f\x7f]", "", text)
     return text.replace("\xa0", " ")
 
 
 def remove_control_chars(text: str) -> str:
     """Remove emoji and control characters (non-ASCII)."""
+    text = re.sub(r"[\x00-\x1f\x7f]", "", text)
     return text.encode("ascii", "ignore").decode()
 
 

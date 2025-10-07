@@ -19,6 +19,7 @@ def get_classifier():
     return pipeline(
         "text-classification",
         model=settings.SENTIMENT_MODEL_ID,
+        truncation=True,
         top_k=None,
     )
 

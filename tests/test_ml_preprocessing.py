@@ -126,7 +126,7 @@ def test_remove_control_chars(text, expected):
         # HTML entities decode
         ("Tom &amp; Jerry", {}, "Tom & Jerry"),
         # control chars (only removed if strip_controls=True)
-        ("bad\x01text", {}, "badtext"),
+        ("bad\x01text", {}, "bad\x01text"),
         ("bad\x01text", {"strip_controls": True}, "badtext"),
         # disabling flags
         ("[link](a.com)", {"remove_md_links": False}, "[link](a.com)"),
@@ -146,6 +146,12 @@ def test_clean_text_pipeline_integration():
     raw = "> [Hello](https://ex.com) &amp; bye  \xa0 https://foo.com🙂"
     cleaned = clean_text(raw, strip_controls=True)
     assert cleaned == "Hello & bye"
+
+
+def test_clean_text_full_pipeline():
+    raw = "Hello &amp; world\n> quoted line\nvisit https://example.com [link](http://x.com)"
+    cleaned = clean_text(raw)
+    assert cleaned == "Hello & world quoted line visit link"
 
 
 def test_prepare_for_input_basic():

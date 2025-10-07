@@ -1,6 +1,5 @@
 from types import SimpleNamespace
 
-import pytest
 
 from app.ml import inference
 
@@ -16,8 +15,8 @@ def teardown_module(module):
 def test_get_classifier_uses_cache(monkeypatch):
     calls = []
 
-    def fake_pipeline(task, model, top_k=None):
-        calls.append((task, model, top_k))
+    def fake_pipeline(task, model, truncation, top_k=None):
+        calls.append((task, model, truncation, top_k))
         return f"pipeline-{len(calls)}"
 
     monkeypatch.setattr(inference, "pipeline", fake_pipeline)
@@ -31,7 +30,7 @@ def test_get_classifier_uses_cache(monkeypatch):
     second = inference.get_classifier()
 
     assert first == second == "pipeline-1"
-    assert calls == [("text-classification", "model-A", None)]
+    assert calls == [("text-classification", "model-A", True, None)]
 
 
 def test_run_batch_inference_truncates_and_flattens(monkeypatch):
