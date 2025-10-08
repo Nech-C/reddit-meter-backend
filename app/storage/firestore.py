@@ -2,6 +2,7 @@
 """Firestore repository abstractions for storing Reddit sentiment data."""
 
 import logging
+import os
 from datetime import datetime, timedelta
 from functools import lru_cache
 from typing import Dict, Sequence
@@ -9,13 +10,22 @@ from typing import Dict, Sequence
 from google.api_core.retry import Retry
 from google.cloud import firestore
 
-from app.config import StorageSettings, get_storage_settings
+from app.config import StorageSettings, get_storage_settings, get_app_settings
 from app.logging_setup import setup_logging
 from app.models.post import Post
 from app import constants
 
 setup_logging()
 log = logging.getLogger("storage.firestore")
+
+log = logging.getLogger("reddit.fetch")
+
+app_settings = get_app_settings()
+if app_settings.GOOGLE_APPLICATION_CREDENTIALS:
+    # only set if not already set (idempotent)
+    os.environ.setdefault(
+        "GOOGLE_APPLICATION_CREDENTIALS", app_settings.GOOGLE_APPLICATION_CREDENTIALS
+    )
 
 
 class FirestoreRepo:
@@ -25,7 +35,7 @@ class FirestoreRepo:
         db: firestore.Client | None = None,
     ):
         self.s = settings if settings else get_storage_settings()
-        self.db = db if db else firestore.Client(database=self.s.FIRESTORE_DATABASE_ID)
+        self.db = db if db else firestore.Client(database=self.s.DATABASE_ID)
         self._retry = Retry(deadline=30.0)
 
     def save_sentiment_summary(self, aggregated_sentiment: dict) -> None:
@@ -62,7 +72,9 @@ class FirestoreRepo:
             serialized.append(dump)
         return serialized
 
-    def save_post_archive(self, posts: Sequence[Post | dict], timestamp: str = None) -> None:
+    def save_post_archive(
+        self, posts: Sequence[Post | dict], timestamp: str = None
+    ) -> None:
         """
         Save all posts from one job into a single Firestore document.
         Document name will be based on UTC timestamp: YYYYMMDDHH

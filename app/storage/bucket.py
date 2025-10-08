@@ -1,4 +1,3 @@
-import os
 import json
 import logging
 from typing import Union
@@ -14,7 +13,7 @@ log = logging.getLogger("storage.bucket")
 
 
 class BucketRepo:
-    def __init__(self, settings: StorageSettings, client: storage.Client):
+    def __init__(self, settings: StorageSettings = None, client: storage.Client = None):
         self.s = settings if settings else get_storage_settings()
         self.client = client if client else storage.Client()
 
@@ -29,7 +28,7 @@ class BucketRepo:
             bucket_name (str): GCS bucket name
         """
         if bucket_name is None:
-            bucket_name = os.getenv("GOOGLE_BUCKET_NAME")
+            bucket_name = self.s.GOOGLE_BUCKET_NAME
         bucket = self.client.bucket(bucket_name)
         blob = bucket.blob(blob_name)
         json_str = json.dumps(json_data, indent=2)
