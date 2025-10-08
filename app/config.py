@@ -10,6 +10,19 @@ env_name = os.getenv("APP_ENV", "dev")
 env_file = f".env.{env_name}"
 
 
+class AppSettings(BaseSettings):
+    model_config = SettingsConfigDict(
+        env_file=env_file, case_sensitive=True, extra="ignore"
+    )
+    # declare so pydantic reads it from .env.test etc.
+    GOOGLE_APPLICATION_CREDENTIALS: str | None = None
+
+
+@lru_cache()
+def get_app_settings() -> AppSettings:
+    return AppSettings()
+
+
 class AnnoWorkerSettings(BaseSettings):
     model_config = SettingsConfigDict(
         env_file=env_file,
@@ -76,14 +89,14 @@ class StorageSettings(BaseSettings):
     SENTIMENT_HISTORY_COLLECTION_NAME: str
     CURRENT_SENTIMENT_COLLECTION_NAME: str
     HISTORY_RETRIEVAL_LIMIT: int = (24 / 4) * 30  # 30 days, history taken every 4 hrs
-    FIRESTORE_DATABASE_ID: str
+    DATABASE_ID: str
     GOOGLE_BUCKET_NAME: str
 
     @field_validator(
         "POST_ARCHIVE_COLLECTION_NAME",
         "SENTIMENT_HISTORY_COLLECTION_NAME",
         "CURRENT_SENTIMENT_COLLECTION_NAME",
-        "FIRESTORE_DATABASE_ID",
+        "DATABASE_ID",
         "GOOGLE_BUCKET_NAME",
     )
     def _require_non_empty(cls, v):

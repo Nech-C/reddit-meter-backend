@@ -5,7 +5,9 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import time
+
 from collections.abc import Iterable, Mapping
 from datetime import datetime, timedelta
 from functools import lru_cache
@@ -14,11 +16,18 @@ from pathlib import Path
 import praw
 
 from app import constants
-from app.config import RedditSettings, get_reddit_settings
+from app.config import RedditSettings, get_reddit_settings, get_app_settings
 from app.models.post import Post, PostComment
 
 
 log = logging.getLogger("reddit.fetch")
+
+app_settings = get_app_settings()
+if app_settings.GOOGLE_APPLICATION_CREDENTIALS:
+    # only set if not already set (idempotent)
+    os.environ.setdefault(
+        "GOOGLE_APPLICATION_CREDENTIALS", app_settings.GOOGLE_APPLICATION_CREDENTIALS
+    )
 
 
 class RedditFetcher:
@@ -180,9 +189,7 @@ class RedditFetcher:
                     break
 
             except Exception as exc:  # pragma: no cover - defensive logging
-                log.exception(
-                    "Error processing submission %s: %s", submission.id, exc
-                )
+                log.exception("Error processing submission %s: %s", submission.id, exc)
 
         if collected_posts < required_posts:
             log.warning(
@@ -218,7 +225,9 @@ class RedditFetcher:
         """
 
         subreddits_by_category = (
-            subreddit_mapping if subreddit_mapping is not None else self.default_subreddits_by_category
+            subreddit_mapping
+            if subreddit_mapping is not None
+            else self.default_subreddits_by_category
         )
 
         aggregated_results: dict[str, list[dict[str, list[Post]]]] = {}
