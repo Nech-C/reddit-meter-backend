@@ -47,7 +47,9 @@ def compute_sentiment_average(posts: Iterable[Post | dict]) -> dict:
     temperature = 1.5  # Try tuning between 100–5000
 
     filtered = [
-        (i, max(p.score or 0, 0)) for i, p in enumerate(valid_posts) if (p.score or 0) > 0
+        (i, max(p.score or 0, 0))
+        for i, p in enumerate(valid_posts)
+        if (p.score or 0) > 0
     ]
     if not filtered:
         return {}
@@ -73,20 +75,20 @@ def compute_sentiment_average(posts: Iterable[Post | dict]) -> dict:
 
     total = sum(weighted_totals.values())
     if total == 0:
-        return {k: 0 for k in weighted_totals}
+        return {label: 0 for label in weighted_totals}
 
-    average = {k: v / total for k, v in weighted_totals.items()}
+    averages = {label: val / total for label, val in weighted_totals.items()}
 
     return {
-        **average,
+        **averages,
         "_top_contributor": {
-            k: [
+            emotion: [
                 {
-                    **entry[2].to_json_dict(),
-                    "contribution": entry[0],
+                    **post.to_json_dict(),
+                    "contribution": contrib,
                 }
-                for entry in v
+                for contrib, _, post in sorted(entries, reverse=True)
             ]
-            for k, v in top_contributors.items()
+            for emotion, entries in top_contributors.items()
         },
     }
