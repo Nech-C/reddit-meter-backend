@@ -1,8 +1,10 @@
 # file: app/jobs/runner.py
+"""Entrypoint for orchestrating the Reddit sentiment ingestion pipeline."""
+
 import argparse
 import os
 import logging
-from datetime import datetime, timezone
+from datetime import datetime
 
 from app.reddit.fetch import fetch_all_subreddit_posts_by_dict
 from app.ml.inference import run_batch_inference
@@ -12,6 +14,8 @@ from app.storage.firestore import default_repo
 from app.storage.bucket import default_bucket_repo
 from app.ml.preprocessing import prepare_for_input
 from app.logging_setup import setup_logging
+from app.models.post import Post, Sentiment
+from app import constants
 
 setup_logging()
 log = logging.getLogger("jobs.runner")
@@ -39,28 +43,28 @@ def main(
     )
 
     # Step 2: Flatten and prepare for inference
-    all_posts = [
+    all_posts: list[Post] = [
         post for cat in raw_data.values() for sub in cat for post in sub["posts"]
     ]
 
     texts = [
         prepare_for_input(
-            post["title"], post["text"], [c["body"] for c in post["comments"]]
+            post.post_title,
+            post.post_text,
+            [c.body for c in post.post_comments],
         )
         for post in all_posts
     ]
 
     log.info(f"🧠 Running inference on {len(texts)} posts...")
     predictions = run_batch_inference(texts)
+    processing_timestamp = datetime.now(constants.TIMEZONE)
     for i, post in enumerate(all_posts):
-        post["sentiment"] = predictions[i]
-        post.update(
-            {
-                "processing_timestamp": datetime.now(timezone.utc).isoformat(),
-                "sentiment_source_model": "bert",
-                "subreddit": post.get("subreddit", "unknown"),
-            }
-        )
+        post.sentiment = Sentiment.model_validate(predictions[i])
+        post.processing_timestamp = processing_timestamp
+        post.sentiment_analysis_model = constants.DEFAULT_SENTIMENT_SOURCE
+        if not post.post_subreddit:
+            post.post_subreddit = "unknown"
 
     # Step 3: Aggregate
     aggregated = compute_sentiment_average(all_posts)
@@ -72,8 +76,9 @@ def main(
     if history:
         repo.save_sentiment_history(aggregated)
     if archive:
-        timestamp = datetime.now(timezone.utc).isoformat()
-        default_bucket_repo().upload_json(all_posts, timestamp)
+        timestamp = processing_timestamp.isoformat()
+        serialized_posts = [post.to_json_dict() for post in all_posts]
+        default_bucket_repo().upload_json(serialized_posts, timestamp)
 
     log.info("✅ All steps completed.")
 

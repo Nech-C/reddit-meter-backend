@@ -1,11 +1,16 @@
 # File: app/reddit/fetch.py
+"""Utilities for fetching Reddit posts and converting them into typed models."""
+
 import json
 import os
 import time
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from dotenv import load_dotenv
 import praw
+
+from app import constants
+from app.models.post import Post, PostComment
 
 env_name = os.getenv("APP_ENV", "dev")
 load_dotenv(f".env.{env_name}")
@@ -43,8 +48,8 @@ def fetch_subreddit_posts(
     required_posts: int = 15,
     comment_limit: int = 5,
     fetch_buffer: int = 100,
-    max_post_age_days: int = 7,
-) -> list:
+    max_post_age_days: int = constants.DEFAULT_MAX_POST_AGE_DAYS,
+) -> list[Post]:
     """
     Fetch up to `required_posts` valid posts, each with at least `comment_limit` valid comments.
     Filters out image-based posts and comments.
@@ -57,14 +62,14 @@ def fetch_subreddit_posts(
         fetch_buffer (int): How many posts to sample total. Defaults to 100.
         max_post_age_days (int):
     Returns:
-        list: List of filtered post dictionaries.
+        list[Post]: List of validated Post models.
     """
     if method not in ["hot", "new", "top"]:
         raise ValueError("Method must be one of 'hot', 'new', or 'top'.")
 
     subreddit = reddit.subreddit(subreddit_name)
     fetch_method = getattr(subreddit, method)
-    results = []
+    results: list[Post] = []
     collected = 0
 
     for submission in fetch_method(limit=fetch_buffer):
@@ -73,27 +78,32 @@ def fetch_subreddit_posts(
             continue
 
         # skip old posts
-        cutoff = datetime.utcnow().timestamp() - max_post_age_days * 86400
-        if submission.created_utc < cutoff:
+        cutoff_ts = datetime.now(constants.TIMEZONE) - timedelta(
+            days=max_post_age_days
+        )
+        if submission.created_utc < cutoff_ts.timestamp():
             continue
         try:
             print(f"Processing submission: {submission.id} - {submission.title}")
             submission.comments.replace_more(limit=5)
 
-            valid_comments = []
+            valid_comments: list[PostComment] = []
             for comment in submission.comments:
                 if not comment.body or not comment.body.strip():
                     continue
                 if comment.author == "AutoModerator":
                     continue
                 valid_comments.append(
-                    {
-                        "body": comment.body,
-                        "author": (
-                            str(comment.author) if comment.author else "[deleted]"
+                    PostComment(
+                        body=comment.body,
+                        author=(
+                            str(comment.author)
+                            if comment.author
+                            else constants.DEFAULT_COMMENT_AUTHOR_PLACEHOLDER
                         ),
-                        "score": comment.score,
-                    }
+                        score=max(comment.score or 0, 0),
+                        created_utc=getattr(comment, "created_utc", None),
+                    )
                 )
                 if len(valid_comments) >= comment_limit:
                     break
@@ -102,20 +112,19 @@ def fetch_subreddit_posts(
             if len(valid_comments) < comment_limit:
                 continue
 
-            post_data = {
-                "id": submission.id,
-                "title": submission.title,
-                "text": submission.selftext,
-                "url": f"https://reddit.com{submission.permalink}",
-                "score": submission.score,
-                "num_comments": submission.num_comments,
-                "created_utc": submission.created_utc,
-                "created": datetime.utcfromtimestamp(
-                    submission.created_utc
-                ).isoformat(),
-                "comments": valid_comments,
-                "subreddit": subreddit_name,
-            }
+            post_data = Post(
+                post_id=submission.id,
+                post_title=submission.title,
+                post_text=submission.selftext,
+                post_url=f"https://reddit.com{submission.permalink}",
+                score=submission.score,
+                post_comment_count=submission.num_comments,
+                post_created_ts=datetime.fromtimestamp(
+                    submission.created_utc, tz=constants.TIMEZONE
+                ),
+                post_comments=valid_comments,
+                post_subreddit=subreddit_name,
+            )
 
             results.append(post_data)
             collected += 1
@@ -157,14 +166,14 @@ def fetch_all_subreddit_posts_by_dict(
         comment_per_post (int): Minimum number of valid comments per post. Defaults to 5.
         fetch_buffer (int): How many posts to sample total per subreddit. Defaults to 100.
     Returns:
-        dict: Dictionary of subreddit names to lists of post dictionaries.
+        dict: Dictionary of subreddit names to lists of validated Post models.
     """
 
     res = {}
     for category, subreddits in sub_dict.items():
         res[category] = []
         for subreddit in subreddits:
-            time.sleep(1)
+            time.sleep(constants.DEFAULT_FETCH_SLEEP_SECONDS)
             subreddit_dict = {
                 "name": subreddit,
                 "posts": fetch_subreddit_posts(

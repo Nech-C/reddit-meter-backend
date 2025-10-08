@@ -1,4 +1,6 @@
 # app/models/post.py
+"""Typed representations of Reddit posts, comments and sentiment scores."""
+
 from typing import Optional, List, Annotated, Any
 from datetime import datetime
 import math
@@ -20,15 +22,12 @@ Probability = Annotated[float, Field(ge=0.0, le=1.0)]
 
 
 class PostComment(BaseModel):
-    """_summary_
-
-    Args:
-        BaseModel (_type_): _description_
-    """
+    """Minimal, validated representation of a Reddit comment."""
 
     body: str
     author: Optional[str] = None
-    score: Annotated[Optional[int], Field(ge=-0)] = None
+    # Reddit returns non-negative scores; enforce to guard against invalid data.
+    score: OptNonNegativeInt = None
     created_utc: Optional[float] = None  # unix seconds
 
     model_config = ConfigDict(extra="ignore")
@@ -63,30 +62,48 @@ class Sentiment(BaseModel):
 
 
 class Post(BaseModel):
+    """Validated Reddit post including metadata, comments, and sentiment."""
+
     model_config = ConfigDict(extra="ignore", populate_by_name=True)
 
-    # source fields (make them optional with defaults if callers may omit)
-    post_id: Optional[str] = None
-    post_url: Optional[HttpUrl] = None
-    post_title: Optional[str] = None
-    # prefer datetime for easier handling
-    post_created_ts: Optional[datetime] = None
+    # Source fields set by the Reddit API fetcher.
+    post_id: Optional[str] = Field(default=None, alias="id")
+    post_url: Optional[HttpUrl] = Field(default=None, alias="url")
+    post_title: Optional[str] = Field(default=None, alias="title")
+    post_text: Optional[str] = Field(default=None, alias="text")
+    # Prefer aware datetimes for easier downstream processing.
+    post_created_ts: Optional[datetime] = Field(default=None, alias="created")
 
-    score: OptNonNegativeInt = None
+    score: Optional[int] = None
 
-    post_comment_count: OptNonNegativeInt = None
-    post_comments: List[PostComment] = Field(default_factory=list)
+    post_comment_count: OptNonNegativeInt = Field(
+        default=None, alias="num_comments"
+    )
+    post_comments: List[PostComment] = Field(default_factory=list, alias="comments")
 
-    post_subreddit: Optional[str] = None
+    post_subreddit: Optional[str] = Field(default=None, alias="subreddit")
 
-    # generated / processing
+    # Generated / processing metadata.
     contribution: OptNonNegativeInt = None
     sentiment: Optional[Sentiment] = None
     processing_timestamp: Optional[datetime] = Field(
         default_factory=lambda: datetime.now(constants.TIMEZONE)
     )
-    sentiment_analysis_model: Optional[str] = None
+    sentiment_analysis_model: Optional[str] = Field(
+        default=None, alias="sentiment_source_model"
+    )
     sentiment_model_version: Optional[str] = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def _apply_legacy_keys(cls, data: Any):
+        """Support legacy dictionary keys from the previous implementation."""
+
+        if isinstance(data, dict):
+            data = data.copy()
+            if "created_utc" in data and "created" not in data:
+                data["created"] = data["created_utc"]
+        return data
 
     @field_validator("post_created_ts", mode="before")
     @classmethod
@@ -117,3 +134,13 @@ class Post(BaseModel):
                     "processing_timestamp cannot be earlier than post_created_ts"
                 )
         return self
+
+    def to_json_dict(self) -> dict:
+        """Return a JSON-serialisable dictionary representation of the post."""
+
+        return self.model_dump(mode="json", by_alias=True, exclude_none=True)
+
+    def to_python_dict(self) -> dict:
+        """Return a Python-native dictionary suitable for Firestore writes."""
+
+        return self.model_dump(mode="python", by_alias=True, exclude_none=True)
