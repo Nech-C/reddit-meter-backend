@@ -30,7 +30,9 @@ def run_batch_inference(texts: list[str], batch_size: int = 32) -> list[dict]:
         batch = texts[i : i + batch_size]
         if os.getenv("APP_ENV") == "test":
             print(f"batch: {batch}")
-        truncated = [text[: settings.BERT_MAX_TOKEN] for text in batch]
+        truncated = [
+            text[: settings.BATCH_MAX_TOKENS] for text in batch
+        ]  # change BATCH_MAX_TOKEN
         results = get_classifier()(truncated)
 
         all_results.extend([{res["label"]: res["score"] for res in r} for r in results])

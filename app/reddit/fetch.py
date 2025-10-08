@@ -1,40 +1,269 @@
 # File: app/reddit/fetch.py
+"""Utilities for fetching Reddit posts and converting them into typed models."""
+
+from __future__ import annotations
+
 import json
+import logging
 import os
 import time
-from datetime import datetime
 
-from dotenv import load_dotenv
+from collections.abc import Iterable, Mapping
+from datetime import datetime, timedelta
+from functools import lru_cache
+from pathlib import Path
+
 import praw
 
-env_name = os.getenv("APP_ENV", "dev")
-load_dotenv(f".env.{env_name}")
-
-SUBREDDIT_JSON_PATH = os.getenv("SUBREDDIT_JSON_PATH")
-DEFAULT_SUBBREDDITS_BY_CATEGORY = json.load(open(SUBREDDIT_JSON_PATH, "r"))
-reddit = None
+from app import constants
+from app.config import RedditSettings, get_reddit_settings, get_app_settings
+from app.models.post import Post, PostComment
 
 
-def initialize():
-    global reddit
-    reddit = praw.Reddit(
-        client_id=os.getenv("REDDIT_CLIENT_ID"),
-        client_secret=os.getenv("REDDIT_CLIENT_SECRET"),
-        password=os.getenv("REDDIT_PASSWORD"),
-        user_agent=os.getenv("REDDIT_USER_AGENT"),
-        username=os.getenv("REDDIT_USERNAME"),
-        ratelimit_seconds=int(os.getenv("REDDIT_RATELIMIT_SECONDS", "600")),
+log = logging.getLogger("reddit.fetch")
+
+app_settings = get_app_settings()
+if app_settings.GOOGLE_APPLICATION_CREDENTIALS:
+    # only set if not already set (idempotent)
+    os.environ.setdefault(
+        "GOOGLE_APPLICATION_CREDENTIALS", app_settings.GOOGLE_APPLICATION_CREDENTIALS
     )
 
-    # check if it's initialized
-    if reddit.user.me() != os.getenv("REDDIT_USERNAME"):
-        raise ValueError(
-            "Reddit API initialization failed. Check your credentials in .env file."
+
+class RedditFetcher:
+    """Encapsulates the logic for fetching and preparing Reddit posts."""
+
+    def __init__(
+        self,
+        settings: RedditSettings | None = None,
+        reddit_client: praw.Reddit | None = None,
+        *,
+        subreddit_config_path: str | None = None,
+    ) -> None:
+        """Create a new :class:`RedditFetcher`.
+
+        Args:
+            settings: Optional settings instance. If omitted a cached instance
+                from :func:`app.config.get_reddit_settings` will be used.
+            reddit_client: Pre-configured PRAW client. When ``None`` a new
+                client is created from ``settings``.
+            subreddit_config_path: Optional override for the default JSON file
+                containing subreddit categories.
+        """
+
+        self.settings = settings or get_reddit_settings()
+        self._reddit = reddit_client or self._build_reddit_client()
+        self._subreddit_config_path = (
+            Path(subreddit_config_path)
+            if subreddit_config_path
+            else Path(self.settings.SUBREDDIT_JSON_PATH)
         )
-    print(f"Logged in as {reddit.user.me()}")
+        self._default_subreddits_by_category = self._load_default_subreddits()
+
+    def _build_reddit_client(self) -> praw.Reddit:
+        """Create a new authenticated PRAW client using configured settings."""
+
+        client = praw.Reddit(
+            client_id=self.settings.CLIENT_ID,
+            client_secret=self.settings.CLIENT_SECRET,
+            password=self.settings.PASSWORD,
+            user_agent=self.settings.USER_AGENT,
+            username=self.settings.USERNAME,
+            ratelimit_seconds=self.settings.RATELIMIT_SECONDS,
+        )
+
+        authenticated_user = client.user.me()
+        if authenticated_user != self.settings.USERNAME:
+            raise ValueError(
+                "Reddit API initialization failed. Check your credentials in the environment."
+            )
+        log.info("Logged in as %s", authenticated_user)
+        return client
+
+    def _load_default_subreddits(self) -> dict[str, list[str]]:
+        """Load the JSON mapping of categories to subreddits."""
+
+        with self._subreddit_config_path.open(encoding="utf-8") as config_file:
+            data = json.load(config_file)
+
+        if not isinstance(data, dict):
+            raise ValueError(
+                "Subreddit configuration must be a JSON object mapping categories to subreddit lists."
+            )
+        return data
+
+    @property
+    def default_subreddits_by_category(self) -> dict[str, list[str]]:
+        """Expose the default subreddit configuration."""
+
+        return self._default_subreddits_by_category
+
+    def fetch_subreddit_posts(
+        self,
+        subreddit_name: str,
+        method: str = "hot",
+        required_posts: int = 15,
+        comment_limit: int = 5,
+        fetch_buffer: int = 100,
+        max_post_age_days: int = constants.DEFAULT_MAX_POST_AGE_DAYS,
+    ) -> list[Post]:
+        """Fetch and normalize posts for a single subreddit.
+
+        Args:
+            subreddit_name: Name of the subreddit to query.
+            method: Listing strategy (``hot``, ``new`` or ``top``).
+            required_posts: Number of valid posts to return.
+            comment_limit: Minimum number of valid comments per post.
+            fetch_buffer: Total number of submissions to inspect.
+            max_post_age_days: Maximum age of posts to include.
+
+        Returns:
+            A list of validated :class:`~app.models.post.Post` instances.
+        """
+
+        if method not in {"hot", "new", "top"}:
+            raise ValueError("Method must be one of 'hot', 'new', or 'top'.")
+
+        subreddit = self._reddit.subreddit(subreddit_name)
+        listing_method = getattr(subreddit, method)
+        normalized_posts: list[Post] = []
+        collected_posts = 0
+        cutoff_timestamp = (
+            datetime.now(constants.TIMEZONE) - timedelta(days=max_post_age_days)
+        ).timestamp()
+
+        for submission in listing_method(limit=fetch_buffer):
+            if not submission.selftext.strip() and not submission.title.strip():
+                continue
+
+            if submission.created_utc < cutoff_timestamp:
+                continue
+
+            try:
+                log.debug(
+                    "Processing submission %s - %s", submission.id, submission.title
+                )
+                submission.comments.replace_more(limit=5)
+
+                valid_comments: list[PostComment] = []
+                for comment in submission.comments:
+                    if not comment.body or not comment.body.strip():
+                        continue
+                    if comment.author == "AutoModerator":
+                        continue
+                    valid_comments.append(
+                        PostComment(
+                            body=comment.body,
+                            author=(
+                                str(comment.author)
+                                if comment.author
+                                else constants.DEFAULT_COMMENT_AUTHOR_PLACEHOLDER
+                            ),
+                            score=max(comment.score or 0, 0),
+                            created_utc=getattr(comment, "created_utc", None),
+                        )
+                    )
+                    if len(valid_comments) >= comment_limit:
+                        break
+
+                if len(valid_comments) < comment_limit:
+                    continue
+
+                post_model = Post(
+                    post_id=submission.id,
+                    post_title=submission.title,
+                    post_text=submission.selftext,
+                    post_url=f"https://reddit.com{submission.permalink}",
+                    score=submission.score,
+                    post_comment_count=submission.num_comments,
+                    post_created_ts=datetime.fromtimestamp(
+                        submission.created_utc, tz=constants.TIMEZONE
+                    ),
+                    post_comments=valid_comments,
+                    post_subreddit=subreddit_name,
+                )
+
+                normalized_posts.append(post_model)
+                collected_posts += 1
+                if collected_posts >= required_posts:
+                    break
+
+            except Exception as exc:  # pragma: no cover - defensive logging
+                log.exception("Error processing submission %s: %s", submission.id, exc)
+
+        if collected_posts < required_posts:
+            log.warning(
+                "Only collected %s/%s posts after fetching %s entries from %s",
+                collected_posts,
+                required_posts,
+                fetch_buffer,
+                subreddit_name,
+            )
+
+        return normalized_posts
+
+    def fetch_all_subreddit_posts_by_dict(
+        self,
+        subreddit_mapping: Mapping[str, Iterable[str]] | None = None,
+        method: str = "hot",
+        posts_per_subreddit: int = 15,
+        comment_per_post: int = 5,
+        fetch_buffer: int = 100,
+    ) -> dict[str, list[dict[str, list[Post]]]]:
+        """Fetch posts for all subreddits defined by a category mapping.
+
+        Args:
+            subreddit_mapping: Mapping of category name to iterable of subreddit names.
+                When omitted, :attr:`default_subreddits_by_category` is used.
+            method: Listing strategy to apply for each subreddit.
+            posts_per_subreddit: Number of valid posts to fetch per subreddit.
+            comment_per_post: Minimum number of valid comments per post.
+            fetch_buffer: Total number of submissions to inspect per subreddit.
+
+        Returns:
+            Dictionary keyed by category containing subreddit data with posts.
+        """
+
+        subreddits_by_category = (
+            subreddit_mapping
+            if subreddit_mapping is not None
+            else self.default_subreddits_by_category
+        )
+
+        aggregated_results: dict[str, list[dict[str, list[Post]]]] = {}
+        for category_name, subreddit_names in subreddits_by_category.items():
+            aggregated_results[category_name] = []
+            for subreddit_name in subreddit_names:
+                time.sleep(constants.DEFAULT_FETCH_SLEEP_SECONDS)
+                posts = self.fetch_subreddit_posts(
+                    subreddit_name=subreddit_name,
+                    method=method,
+                    required_posts=posts_per_subreddit,
+                    comment_limit=comment_per_post,
+                    fetch_buffer=fetch_buffer,
+                )
+                aggregated_results[category_name].append(
+                    {"name": subreddit_name, "posts": posts}
+                )
+                log.info(
+                    "Fetched %s posts from %s in category %s",
+                    len(posts),
+                    subreddit_name,
+                    category_name,
+                )
+            log.info(
+                "Completed fetching category %s with %s subreddits.",
+                category_name,
+                len(aggregated_results[category_name]),
+            )
+        return aggregated_results
 
 
-initialize()
+@lru_cache(maxsize=1)
+def default_fetcher() -> RedditFetcher:
+    """Return a cached :class:`RedditFetcher` instance."""
+
+    return RedditFetcher()
 
 
 def fetch_subreddit_posts(
@@ -43,143 +272,39 @@ def fetch_subreddit_posts(
     required_posts: int = 15,
     comment_limit: int = 5,
     fetch_buffer: int = 100,
-    max_post_age_days: int = 7,
-) -> list:
+    max_post_age_days: int = constants.DEFAULT_MAX_POST_AGE_DAYS,
+) -> list[Post]:
+    """Fetch subreddit posts using the shared :class:`RedditFetcher` instance.
+
+    Args mirror :meth:`RedditFetcher.fetch_subreddit_posts`.
     """
-    Fetch up to `required_posts` valid posts, each with at least `comment_limit` valid comments.
-    Filters out image-based posts and comments.
 
-    Args:
-        subreddit_name (str): Subreddit to fetch from.
-        method (str): 'hot', 'new', or 'top'. Defaults to 'hot'.
-        required_posts (int): Number of usable posts to return. defaults to 15.
-        comment_limit (int): Minimum number of valid comments per post. Defaults to 5.
-        fetch_buffer (int): How many posts to sample total. Defaults to 100.
-        max_post_age_days (int):
-    Returns:
-        list: List of filtered post dictionaries.
-    """
-    if method not in ["hot", "new", "top"]:
-        raise ValueError("Method must be one of 'hot', 'new', or 'top'.")
-
-    subreddit = reddit.subreddit(subreddit_name)
-    fetch_method = getattr(subreddit, method)
-    results = []
-    collected = 0
-
-    for submission in fetch_method(limit=fetch_buffer):
-        # Filter out image/empty posts
-        if not submission.selftext.strip() and not submission.title.strip():
-            continue
-
-        # skip old posts
-        cutoff = datetime.utcnow().timestamp() - max_post_age_days * 86400
-        if submission.created_utc < cutoff:
-            continue
-        try:
-            print(f"Processing submission: {submission.id} - {submission.title}")
-            submission.comments.replace_more(limit=5)
-
-            valid_comments = []
-            for comment in submission.comments:
-                if not comment.body or not comment.body.strip():
-                    continue
-                if comment.author == "AutoModerator":
-                    continue
-                valid_comments.append(
-                    {
-                        "body": comment.body,
-                        "author": (
-                            str(comment.author) if comment.author else "[deleted]"
-                        ),
-                        "score": comment.score,
-                    }
-                )
-                if len(valid_comments) >= comment_limit:
-                    break
-
-            # Only keep the post if enough valid comments
-            if len(valid_comments) < comment_limit:
-                continue
-
-            post_data = {
-                "id": submission.id,
-                "title": submission.title,
-                "text": submission.selftext,
-                "url": f"https://reddit.com{submission.permalink}",
-                "score": submission.score,
-                "num_comments": submission.num_comments,
-                "created_utc": submission.created_utc,
-                "created": datetime.utcfromtimestamp(
-                    submission.created_utc
-                ).isoformat(),
-                "comments": valid_comments,
-                "subreddit": subreddit_name,
-            }
-
-            results.append(post_data)
-            collected += 1
-            if collected >= required_posts:
-                break
-
-        except Exception as e:
-            print(f"Error processing submission {submission.id}: {e}")
-
-    if collected < required_posts:
-        print(
-            f"Warning: Only collected {collected}/{required_posts} posts after fetching {fetch_buffer}"
-        )
-
-    return results
+    return default_fetcher().fetch_subreddit_posts(
+        subreddit_name=subreddit_name,
+        method=method,
+        required_posts=required_posts,
+        comment_limit=comment_limit,
+        fetch_buffer=fetch_buffer,
+        max_post_age_days=max_post_age_days,
+    )
 
 
 def fetch_all_subreddit_posts_by_dict(
-    sub_dict: dict = DEFAULT_SUBBREDDITS_BY_CATEGORY,
+    sub_dict: Mapping[str, Iterable[str]] | None = None,
     method: str = "hot",
     posts_per_subreddit: int = 15,
     comment_per_post: int = 5,
     fetch_buffer: int = 100,
-) -> dict:
-    """
-    Fetch posts by subreddit dictionary.
-    Args:
-        sub_dict (dict): Dictionary of subreddit categories and their subreddits. Defaults to the loaded JSON from `subreddits.json`.
-            {
-                "subreddit category": [
-                    "subreddit1",
-                    "subreddit2",
-                    ...
-                ]
-            }
+) -> dict[str, list[dict[str, list[Post]]]]:
+    """Fetch posts for multiple subreddits using the shared fetcher instance.
 
-        method (str): 'hot', 'new', or 'top'. Defaults to 'hot'.
-        posts_per_subreddit (int): Number of usable posts to return per subreddit. Defaults to 15.
-        comment_per_post (int): Minimum number of valid comments per post. Defaults to 5.
-        fetch_buffer (int): How many posts to sample total per subreddit. Defaults to 100.
-    Returns:
-        dict: Dictionary of subreddit names to lists of post dictionaries.
+    Args mirror :meth:`RedditFetcher.fetch_all_subreddit_posts_by_dict`.
     """
 
-    res = {}
-    for category, subreddits in sub_dict.items():
-        res[category] = []
-        for subreddit in subreddits:
-            time.sleep(1)
-            subreddit_dict = {
-                "name": subreddit,
-                "posts": fetch_subreddit_posts(
-                    subreddit_name=subreddit,
-                    method=method,
-                    required_posts=posts_per_subreddit,
-                    comment_limit=comment_per_post,
-                    fetch_buffer=fetch_buffer,
-                ),
-            }
-            res[category].append(subreddit_dict)
-            print(
-                f"Fetched {len(subreddit_dict['posts'])} posts from {subreddit} in category {category}"
-            )
-        print(
-            f"Completed fetching category: {category} with {len(res[category])} subreddits."
-        )
-    return res
+    return default_fetcher().fetch_all_subreddit_posts_by_dict(
+        subreddit_mapping=sub_dict,
+        method=method,
+        posts_per_subreddit=posts_per_subreddit,
+        comment_per_post=comment_per_post,
+        fetch_buffer=fetch_buffer,
+    )

@@ -1,12 +1,26 @@
 # app/config.py
 import os
 from functools import lru_cache
+from pathlib import Path
 
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 env_name = os.getenv("APP_ENV", "dev")
 env_file = f".env.{env_name}"
+
+
+class AppSettings(BaseSettings):
+    model_config = SettingsConfigDict(
+        env_file=env_file, case_sensitive=True, extra="ignore"
+    )
+    # declare so pydantic reads it from .env.test etc.
+    GOOGLE_APPLICATION_CREDENTIALS: str | None = None
+
+
+@lru_cache()
+def get_app_settings() -> AppSettings:
+    return AppSettings()
 
 
 class AnnoWorkerSettings(BaseSettings):
@@ -75,14 +89,14 @@ class StorageSettings(BaseSettings):
     SENTIMENT_HISTORY_COLLECTION_NAME: str
     CURRENT_SENTIMENT_COLLECTION_NAME: str
     HISTORY_RETRIEVAL_LIMIT: int = (24 / 4) * 30  # 30 days, history taken every 4 hrs
-    FIRESTORE_DATABASE_ID: str
+    DATABASE_ID: str
     GOOGLE_BUCKET_NAME: str
 
     @field_validator(
         "POST_ARCHIVE_COLLECTION_NAME",
         "SENTIMENT_HISTORY_COLLECTION_NAME",
         "CURRENT_SENTIMENT_COLLECTION_NAME",
-        "FIRESTORE_DATABASE_ID",
+        "DATABASE_ID",
         "GOOGLE_BUCKET_NAME",
     )
     def _require_non_empty(cls, v):
@@ -129,3 +143,57 @@ def get_inference_settings() -> InferenceSettings:
         InferenceSettings: An instance of InferenceSettings with loaded configuration.
     """
     return InferenceSettings()
+
+
+class RedditSettings(BaseSettings):
+    """Settings required for interacting with the Reddit API."""
+
+    model_config = SettingsConfigDict(
+        env_file=env_file,
+        case_sensitive=True,
+        env_prefix="REDDIT_",
+        env_nested_delimiter="__",
+        secrets_dir=None,
+        extra="ignore",
+    )
+
+    CLIENT_ID: str
+    CLIENT_SECRET: str
+    PASSWORD: str
+    USER_AGENT: str
+    USERNAME: str
+    RATELIMIT_SECONDS: int = 600
+    SUBREDDIT_JSON_PATH: str
+
+    @field_validator(
+        "CLIENT_ID",
+        "CLIENT_SECRET",
+        "PASSWORD",
+        "USER_AGENT",
+        "USERNAME",
+        "SUBREDDIT_JSON_PATH",
+    )
+    def _require_non_empty(cls, value: str) -> str:
+        if not value:
+            raise ValueError("must be set and non-empty")
+        return value
+
+    @field_validator("RATELIMIT_SECONDS")
+    def _validate_ratelimit(cls, value: int) -> int:
+        if value < 0:
+            raise ValueError("ratelimit must be non-negative")
+        return value
+
+    @field_validator("SUBREDDIT_JSON_PATH")
+    def _validate_path_exists(cls, value: str) -> str:
+        path = Path(value)
+        if not path.exists():
+            raise ValueError(f"subreddit JSON file not found: {value}")
+        return value
+
+
+@lru_cache(maxsize=1)
+def get_reddit_settings() -> RedditSettings:
+    """Return cached Reddit API settings."""
+
+    return RedditSettings()
