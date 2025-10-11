@@ -1,20 +1,13 @@
 # File: tests/conftest.py
-import sys
-from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT))
-VER = f"python{sys.version_info.major}.{sys.version_info.minor}"
-VENVP = ROOT / ".venv" / "lib" / VER / "site-packages"
-if VENVP.exists():
-    sys.path.insert(0, str(VENVP))
 
 import pytest
+from fastapi.testclient import TestClient
+from slowapi import Limiter
 from unittest.mock import MagicMock
 
-from fastapi.testclient import TestClient
-
 from app.storage.firestore import FirestoreRepo
+from app.api import main
 
 
 @pytest.fixture
@@ -140,20 +133,14 @@ def firestore_repo(mock_db):
 
 @pytest.fixture
 def client(monkeypatch):
-    """
-    Fixture that yields a TestClient with FirestoreRepo dependency overridden.
-    All API routes that use Depends(get_repo) will receive a MagicMock instead.
-    """
-    from app.api import main
+    main.app.state.limiter = Limiter(
+        key_func=lambda r: r.headers.get("X-Test-Id", "testclient")
+    )
 
     fake_repo = MagicMock(spec=FirestoreRepo)
-
-    # Override FastAPI dependency injection
     main.app.dependency_overrides[main.get_repo] = lambda: fake_repo
 
     with TestClient(main.app) as test_client:
-        # expose both client and fake_repo
         yield test_client, fake_repo
 
-    # cleanup overrides after test
     main.app.dependency_overrides.clear()

@@ -23,7 +23,7 @@ def test_get_classifier_uses_cache(monkeypatch):
     monkeypatch.setattr(
         inference,
         "settings",
-        SimpleNamespace(SENTIMENT_MODEL_ID="model-A", BERT_MAX_TOKEN=128),
+        SimpleNamespace(SENTIMENT_MODEL_ID="model-A", BATCH_MAX_TOKENS=128),
     )
 
     first = inference.get_classifier()
@@ -51,7 +51,7 @@ def test_run_batch_inference_truncates_and_flattens(monkeypatch):
     monkeypatch.setattr(
         inference,
         "settings",
-        SimpleNamespace(BERT_MAX_TOKEN=5, SENTIMENT_MODEL_ID="model-A"),
+        SimpleNamespace(BATCH_MAX_TOKENS=5, SENTIMENT_MODEL_ID="model-A"),
     )
 
     texts = ["abcdefgh", "ijklmnop"]

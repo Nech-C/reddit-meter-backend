@@ -22,7 +22,9 @@ def test_upload_json_uses_env_bucket(monkeypatch):
     mock_bucket = mock_client.bucket.return_value
     mock_blob = mock_bucket.blob.return_value
 
-    repo = bucket.BucketRepo(settings=SimpleNamespace(), client=mock_client)
+    repo = bucket.BucketRepo(
+        settings=SimpleNamespace(GOOGLE_BUCKET_NAME="env-bucket"), client=mock_client
+    )
 
     monkeypatch.setenv("GOOGLE_BUCKET_NAME", "env-bucket")
 
@@ -41,7 +43,9 @@ def test_upload_json_with_explicit_bucket():
     mock_bucket = mock_client.bucket.return_value
     mock_blob = mock_bucket.blob.return_value
 
-    repo = bucket.BucketRepo(settings=SimpleNamespace(), client=mock_client)
+    repo = bucket.BucketRepo(
+        settings=SimpleNamespace(GOOGLE_BUCKET_NAME="bucket"), client=mock_client
+    )
 
     repo.upload_json({"n": 1}, "blob.json", bucket_name="custom-bucket")
 
