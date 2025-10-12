@@ -44,6 +44,9 @@ def read_root():
     return {"message": "Hello, World!"}
 
 
+# TODO: convert timestamps into ISO strings before returning results. do it in pydantic?
+
+
 @app.get("/sentiment/current")
 @app.state.limiter.limit("10/minute")
 def get_current_sentiment(request: Request, repo=Depends(get_repo)):
