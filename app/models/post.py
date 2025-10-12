@@ -73,12 +73,12 @@ class Post(BaseModel):
     post_text: Optional[str] = Field(default=None, alias="text")
     # Prefer aware datetimes for easier downstream processing.
     post_created_ts: Optional[datetime] = Field(default=None, alias="created")
-
+    # TODO: migrate to post_created_ts
+    # make sure both frontend and backend compatibility
+    # make sure the right format is used for all storage: bigquery, firestore, and gcs
     score: Optional[int] = None
 
-    post_comment_count: OptNonNegativeInt = Field(
-        default=None, alias="num_comments"
-    )
+    post_comment_count: OptNonNegativeInt = Field(default=None, alias="num_comments")
     post_comments: List[PostComment] = Field(default_factory=list, alias="comments")
 
     post_subreddit: Optional[str] = Field(default=None, alias="subreddit")
