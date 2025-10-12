@@ -18,7 +18,6 @@ from app import constants
 setup_logging()
 log = logging.getLogger("storage.firestore")
 
-log = logging.getLogger("reddit.fetch")
 
 app_settings = get_app_settings()
 if app_settings.GOOGLE_APPLICATION_CREDENTIALS:

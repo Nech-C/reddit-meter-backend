@@ -84,7 +84,7 @@ def compute_sentiment_average(posts: Iterable[Post | dict]) -> dict:
         "_top_contributor": {
             emotion: [
                 {
-                    **post.to_json_dict(),
+                    **post.to_python_dict(),
                     "contribution": contrib,
                 }
                 for contrib, _, post in sorted(entries, reverse=True)

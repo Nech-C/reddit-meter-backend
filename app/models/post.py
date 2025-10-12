@@ -11,7 +11,6 @@ from pydantic import (
     field_validator,
     model_validator,
     ConfigDict,
-    HttpUrl,
 )
 
 import app.constants as constants
@@ -68,7 +67,7 @@ class Post(BaseModel):
 
     # Source fields set by the Reddit API fetcher.
     post_id: Optional[str] = Field(default=None, alias="id")
-    post_url: Optional[HttpUrl] = Field(default=None, alias="url")
+    post_url: Optional[str] = Field(default=None, alias="url")
     post_title: Optional[str] = Field(default=None, alias="title")
     post_text: Optional[str] = Field(default=None, alias="text")
     # Prefer aware datetimes for easier downstream processing.
