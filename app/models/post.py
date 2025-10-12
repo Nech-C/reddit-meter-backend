@@ -28,7 +28,7 @@ class PostComment(BaseModel):
     author: Optional[str] = None
     # Reddit returns non-negative scores; enforce to guard against invalid data.
     score: OptNonNegativeInt = None
-    created_utc: Optional[float] = None  # unix seconds
+    created_utc: Optional[datetime] = None  # unix seconds
 
     model_config = ConfigDict(extra="ignore")
 
