@@ -20,19 +20,19 @@ def test_normalized_softmax():
 
 
 def test_compute_sentiment_average_all_emotions(sample_posts):
-    result = compute_sentiment_average(sample_posts)
+    result = compute_sentiment_average(sample_posts).model_dump(by_alias=True)
 
     emotions = ["joy", "sadness", "anger", "fear", "love", "surprise"]
     # All emotions present
     assert set(emotions).issubset(result.keys()), "Missing one of the six emotions"
-    assert "_top_contributor" in result, "Missing '_top_contributor' in result"
+    assert "top_contributor" in result, "Missing 'top_contributor' in result"
 
     # Sum to ~1
     total = sum(result[e] for e in emotions)
     assert pytest.approx(total, rel=1e-6) == 1.0, f"Expected total≈1.0, got {total}"
 
     # Test that for each emotion, top_contributors length <= 3 and entries valid
-    tc = result["_top_contributor"]
+    tc = result["top_contributor"]
     assert set(emotions) == set(tc.keys()), (
         "Every emotion must have a top-contributor list"
     )
@@ -44,6 +44,7 @@ def test_compute_sentiment_average_all_emotions(sample_posts):
         for entry in contribs:
             # Each entry must merge the original post dict and add 'contribution'
             assert "contribution" in entry and isinstance(entry["contribution"], float)
+            print(entry)
             assert entry["id"] in {f"p{i}" for i in range(1, 6)}, (
                 "Contributor id must be one of p1–p5"
             )
@@ -60,11 +61,11 @@ def test_compute_sentiment_average_zero_total():
         }
     ]
     result = compute_sentiment_average(posts)
-    # Each emotion should be 0 and no _top_contributor key
+    # Each emotion should be 0 and no top_contributor key
     for e in ["joy", "sadness", "anger", "fear", "love", "surprise"]:
         assert e in result and result[e] == 0
-    assert "_top_contributor" not in result, (
-        "_top_contributor should be absent when total==0"
+    assert "top_contributor" not in result, (
+        "top_contributor should be absent when total==0"
     )
 
 

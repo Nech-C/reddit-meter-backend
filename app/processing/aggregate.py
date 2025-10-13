@@ -7,7 +7,7 @@ from typing import Iterable
 
 import numpy as np
 
-from app.models.post import Post
+from app.models.post import Post, SentimentSummary
 
 
 def normalized_softmax(x: np.ndarray, temperature: int) -> np.ndarray:
@@ -25,7 +25,7 @@ def _ensure_post(post_data: Post | dict) -> Post:
     return Post.model_validate(post_data)
 
 
-def compute_sentiment_average(posts: Iterable[Post | dict]) -> dict:
+def compute_sentiment_average(posts: Iterable[Post | dict]) -> SentimentSummary:
     """
     Aggregates sentiment scores across all posts.
 
@@ -78,17 +78,18 @@ def compute_sentiment_average(posts: Iterable[Post | dict]) -> dict:
         return {label: 0 for label in weighted_totals}
 
     averages = {label: val / total for label, val in weighted_totals.items()}
-
-    return {
-        **averages,
-        "_top_contributor": {
-            emotion: [
-                {
-                    **post.to_python_dict(),
-                    "contribution": contrib,
-                }
-                for contrib, _, post in sorted(entries, reverse=True)
-            ]
-            for emotion, entries in top_contributors.items()
-        },
-    }
+    return SentimentSummary.model_validate(
+        {
+            **averages,
+            "top_contributor": {
+                emotion: [
+                    {
+                        **post.to_python_dict(),
+                        "contribution": contrib,
+                    }
+                    for contrib, _, post in sorted(entries, reverse=True)
+                ]
+                for emotion, entries in top_contributors.items()
+            },
+        }
+    )
