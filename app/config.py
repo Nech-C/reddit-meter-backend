@@ -197,3 +197,24 @@ def get_reddit_settings() -> RedditSettings:
     """Return cached Reddit API settings."""
 
     return RedditSettings()
+
+
+class BigQuerySettings(BaseSettings):
+    """Settings for BigQuery"""
+
+    model_config = SettingsConfigDict(
+        env_file=env_file,
+        case_sensitive=True,
+        env_prefix="",
+        extra="ignore",
+    )
+    bq_dataset: str = Field(alias="BIGQUERY_DATASET_ID")
+    bq_global_sentiment_history_table: str = Field(
+        alias="BIGQUERY_GLOBAL_SENTIMENT_HISTORY_TABLE"
+    )
+
+
+@lru_cache(maxsize=1)
+def get_bigquery_settings() -> BigQuerySettings:
+    """return cached BigQuery settings"""
+    return BigQuerySettings()

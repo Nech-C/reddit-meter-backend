@@ -50,7 +50,7 @@ def _build_post(post_id: str, subreddit: str, score: int) -> Post:
             PostComment(body="A helpful comment"),
             PostComment(body="Another insight"),
         ],
-        score=score,
+        post_score=score,
         post_comment_count=2,
         post_subreddit=subreddit,
     )
@@ -131,7 +131,7 @@ def test_runner_main_full_pipeline(monkeypatch: pytest.MonkeyPatch) -> None:
     for key in ("joy", "sadness", "anger", "fear", "love", "surprise"):
         assert key in aggregated_summary
         assert 0.0 <= aggregated_summary[key] <= 1.0
-    assert aggregated_summary["top_contributor"], (
+    assert aggregated_summary["top_contributors"], (
         "Top contributor metadata should be populated"
     )
 
@@ -143,7 +143,7 @@ def test_runner_main_full_pipeline(monkeypatch: pytest.MonkeyPatch) -> None:
     assert len(serialized_posts) == len(posts)
     for serialized in serialized_posts:
         assert serialized["sentiment"]["joy"] >= 0.0
-        assert serialized["subreddit"] in {"python", "learnpython"}
+        assert serialized["post_subreddit"] in {"python", "learnpython"}
         serialized_ts = serialized["processing_timestamp"].replace("Z", "+00:00")
         assert datetime.fromisoformat(serialized_ts) == posts[0].processing_timestamp
 

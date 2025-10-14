@@ -38,7 +38,9 @@ def compute_sentiment_average(posts: Iterable[Post | dict]) -> SentimentSummary:
     """
     validated_posts = [_ensure_post(p) for p in posts]
     valid_posts = [
-        p for p in validated_posts if p.sentiment is not None and p.score is not None
+        p
+        for p in validated_posts
+        if p.sentiment is not None and p.post_score is not None
     ]
     if not valid_posts:
         return {}
@@ -47,9 +49,9 @@ def compute_sentiment_average(posts: Iterable[Post | dict]) -> SentimentSummary:
     temperature = 1.5  # Try tuning between 100–5000
 
     filtered = [
-        (i, max(p.score or 0, 0))
+        (i, max(p.post_score or 0, 0))
         for i, p in enumerate(valid_posts)
-        if (p.score or 0) > 0
+        if (p.post_score or 0) > 0
     ]
     if not filtered:
         return {}
@@ -81,15 +83,18 @@ def compute_sentiment_average(posts: Iterable[Post | dict]) -> SentimentSummary:
     return SentimentSummary.model_validate(
         {
             **averages,
-            "top_contributor": {
-                emotion: [
-                    {
-                        **post.to_python_dict(),
-                        "contribution": contrib,
-                    }
-                    for contrib, _, post in sorted(entries, reverse=True)
-                ]
+            "top_contributors": [
+                {
+                    "emotion": emotion,
+                    "top_posts": [
+                        {
+                            **post.to_python_dict(),
+                            "contribution": contrib,
+                        }
+                        for contrib, _, post in sorted(entries, reverse=True)
+                    ],
+                }
                 for emotion, entries in top_contributors.items()
-            },
+            ],
         }
     )
