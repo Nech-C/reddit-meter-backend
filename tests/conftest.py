@@ -130,7 +130,6 @@ def sample_posts() -> list[Post]:
     """
     base = datetime(2025, 1, 2, 0, 0, tzinfo=timezone.utc)
     return [
-        _make_post(post_id="p1", score=50, created_ts=base),
         _make_post(
             post_id="p2",
             score=40,
@@ -139,6 +138,7 @@ def sample_posts() -> list[Post]:
                 joy=0.8, sadness=0.1, anger=0.05, fear=0.02, love=0.02, surprise=0.01
             ),
         ),
+        _make_post(post_id="p1", score=50, created_ts=base),
         _make_post(
             post_id="p3",
             score=30,
@@ -153,13 +153,13 @@ def sample_posts() -> list[Post]:
 
 
 @pytest.fixture
-def sample_summary(sample_posts_models: list[Post]) -> SentimentSummary:
+def sample_summary(sample_posts: list[Post]) -> SentimentSummary:
     """
     A minimal SentimentSummary with top contributors referencing valid Post models.
     Useful when tests want to pass structured data through repo boundaries.
     """
     top = [
-        TopSentimentContributor(emotion="joy", top_posts=sample_posts_models[:3]),
+        TopSentimentContributor(emotion="joy", top_posts=sample_posts[:3]),
     ]
     # SentimentSummary requires the six emotions plus top_contributors
     return SentimentSummary(

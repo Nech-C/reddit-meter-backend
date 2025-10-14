@@ -6,13 +6,14 @@ import os
 from datetime import datetime, timedelta
 from functools import lru_cache
 from typing import Dict, Sequence
+from pydantic import ValidationError
 
 from google.api_core.retry import Retry
 from google.cloud import firestore
 
 from app.config import StorageSettings, get_storage_settings, get_app_settings
 from app.logging_setup import setup_logging
-from app.models.post import Post
+from app.models.post import Post, SentimentSummary
 from app import constants
 
 setup_logging()
@@ -37,18 +38,24 @@ class FirestoreRepo:
         self.db = db if db else firestore.Client(database=self.s.DATABASE_ID)
         self._retry = Retry(deadline=30.0)
 
-    def save_sentiment_summary(self, aggregated_sentiment: dict) -> None:
+    def save_sentiment_summary(self, aggregated_sentiment: SentimentSummary) -> None:
         """
         Save current snapshot of Reddit sentiment to Firestore (sentiment_current/global).
         """
         now = datetime.now(constants.TIMEZONE)
+        try:
+            SentimentSummary.model_validate(aggregated_sentiment)
+        except ValidationError:
+            log.error(
+                "save_sentiment_summary receives aggregated_sentiment that fails to validate"
+            )
         try:
             doc_ref = self.db.collection(
                 self.s.CURRENT_SENTIMENT_COLLECTION_NAME
             ).document("global")
 
             payload = {
-                **aggregated_sentiment,
+                **aggregated_sentiment.model_dump(mode="python", exclude_none=True),
                 "timestamp": now,
                 "updatedAt": firestore.SERVER_TIMESTAMP,
             }
@@ -109,15 +116,21 @@ class FirestoreRepo:
         except Exception:
             log.exception("Failed to archive posts")
 
-    def save_sentiment_history(self, aggregated_sentiment: dict) -> None:
+    def save_sentiment_history(self, aggregated_sentiment: SentimentSummary) -> None:
         """
         Save sentiment snapshot to a timestamped document in Firestore (sentiment_history/<hour>).
         Useful for tracking trends over time.
         """
         now = datetime.now(constants.TIMEZONE)
         hour_key = now.strftime("%Y-%m-%dT%H")
+        try:
+            SentimentSummary.model_validate(aggregated_sentiment)
+        except ValidationError:
+            log.error(
+                "save_sentiment_history receives aggregated_sentiment that fails to validate"
+            )
         payload = {
-            **aggregated_sentiment,
+            **aggregated_sentiment.model_dump(mode="python", exclude_none=True),
             "timestamp": now,
             "updatedAt": firestore.SERVER_TIMESTAMP,
         }

@@ -22,15 +22,14 @@ from unittest.mock import MagicMock
 # ---------------------------
 
 
-def test_save_sentiment_summary_success(firestore_repo, mock_db, fixed_now):
+def test_save_sentiment_summary_success(firestore_repo, mock_db, sample_summary):
     """
     When saving the latest sentiment snapshot:
     - the repo should inject a timezone-aware 'timestamp'
     - forward provided fields (e.g., joy)
     - and call Firestore with retry enabled
     """
-    data = {"joy": 0.9}
-    firestore_repo.save_sentiment_summary(data)
+    firestore_repo.save_sentiment_summary(sample_summary)
 
     collection = mock_db.collection
     document = collection.return_value.document
@@ -38,7 +37,7 @@ def test_save_sentiment_summary_success(firestore_repo, mock_db, fixed_now):
     assert set_call is not None
 
     (payload,), kwargs = set_call
-    assert payload["joy"] == 0.9
+    assert payload["joy"] == sample_summary.joy
     assert isinstance(payload["timestamp"], datetime)
     assert payload["timestamp"].tzinfo is not None
     assert "retry" in kwargs
@@ -131,7 +130,9 @@ def test_save_post_archive_failure_logs(firestore_repo, mock_db, fixed_now, capl
 # ---------------------------
 
 
-def test_save_sentiment_history_success(firestore_repo, mock_db, fixed_now, caplog):
+def test_save_sentiment_history_success(
+    firestore_repo, mock_db, fixed_now, caplog, sample_summary
+):
     """
     History snapshots:
     - document id is ISO-hour (YYYY-MM-DDTHH)
@@ -139,8 +140,7 @@ def test_save_sentiment_history_success(firestore_repo, mock_db, fixed_now, capl
     - retries enabled
     - logs a success message
     """
-    data = {"joy": 0.5}
-    firestore_repo.save_sentiment_history(data)
+    firestore_repo.save_sentiment_history(sample_summary)
 
     doc_call = mock_db.collection.return_value.document.call_args
     (hour_key,), _ = doc_call
@@ -156,14 +156,16 @@ def test_save_sentiment_history_success(firestore_repo, mock_db, fixed_now, capl
     assert any("Saved sentiment history snapshot" in m for m in caplog.messages)
 
 
-def test_save_sentiment_history_failure_logs(firestore_repo, mock_db, caplog):
+def test_save_sentiment_history_failure_logs(
+    firestore_repo, mock_db, caplog, sample_summary
+):
     """Errors from Firestore.set should be logged clearly."""
     mock_db.collection.return_value.document.return_value.set.side_effect = (
         RuntimeError("boom")
     )
 
     with caplog.at_level("ERROR"):
-        firestore_repo.save_sentiment_history({"joy": 0.5})
+        firestore_repo.save_sentiment_history(sample_summary)
 
     assert any("Failed to save sentiment history" in m for m in caplog.messages)
 
