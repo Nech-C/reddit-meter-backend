@@ -153,7 +153,7 @@ class Post(BaseModel):
         - Adds post_text_preview (truncated).
         - Omits None fields for cleaner insert payloads.
         """
-        dump = self.model_dump(mode="python", exclude_none=True)
+        dump = self.model_dump(mode="json", exclude_none=True)
 
         full_text = dump.get("post_text")
         if full_text:
@@ -170,10 +170,14 @@ class Post(BaseModel):
 class TopSentimentContributor(BaseModel):
     """Validated top contributors for a single sentiment"""
 
-    # TODO: we need to redesign this!
     model_config = ConfigDict(extra="ignore")
     emotion: str
     top_posts: List[Post]
+
+    def to_bq_dict(self):
+        dump = self.model_dump(mode="json", exclude_none=True, exclude={"top_posts"})
+        dump["top_posts"] = list(map(Post.to_bq_dict, self.top_posts))
+        return dump
 
 
 class SentimentSummary(BaseModel):
@@ -189,3 +193,12 @@ class SentimentSummary(BaseModel):
     surprise: Probability = 0.0
 
     top_contributors: List[TopSentimentContributor]
+
+    def to_bq_dict(self):
+        dump = self.model_dump(
+            mode="json", exclude_none=True, exclude={"top_contributors"}
+        )
+        dump["top_contributors"] = list(
+            map(TopSentimentContributor.to_bq_dict, self.top_contributors)
+        )
+        return dump

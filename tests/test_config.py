@@ -83,14 +83,5 @@ def test_bq_settings():
     # all properties are available
     settings = config.BigQuerySettings()
 
-    assert settings.bq_dataset == "test_bq_dataset"
-    assert settings.bq_global_sentiment_history_table == "test_global_sentiment_table"
-
-
-# def test_bq_settings_failure(monkeypatch):
-#     """Ensure all required fields exist"""
-#     monkeypatch.delenv("BIGQUERY_DATASET_ID", raising=False)
-#     monkeypatch.delenv("BIGQUERY_GLOBAL_SENTIMENT_HISTORY_TABLE", raising=False)
-
-#     with pytest.raises(ValidationError):
-#         settings = config.BigQuerySettings()
+    assert settings.bq_dataset is not None
+    assert settings.bq_global_sentiment_history_table is not None

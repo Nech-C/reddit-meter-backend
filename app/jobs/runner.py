@@ -10,6 +10,7 @@ from app.reddit.fetch import fetch_all_subreddit_posts_by_dict
 from app.ml.inference import run_batch_inference
 from app.processing.aggregate import compute_sentiment_average
 from app.storage.firestore import default_repo
+from app.storage.bigquery import default_bq_repo
 
 from app.storage.bucket import default_bucket_repo
 from app.ml.preprocessing import prepare_for_input
@@ -71,10 +72,12 @@ def main(
 
     # Step 4: Store
     repo = default_repo()
+    bq_repo = default_bq_repo()
     if snapshot and os.environ.get("APP_ENV") != "test":
         repo.save_sentiment_summary(aggregated)
     if history:
         repo.save_sentiment_history(aggregated)
+        bq_repo.insert_global_sentiment_history(aggregated)
     if archive:
         timestamp = processing_timestamp.isoformat()
         serialized_posts = [post.to_json_dict() for post in all_posts]

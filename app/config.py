@@ -3,6 +3,8 @@ import os
 from functools import lru_cache
 from pathlib import Path
 
+
+from google.api_core.retry import Retry
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -211,6 +213,12 @@ class BigQuerySettings(BaseSettings):
     bq_dataset: str = Field(alias="BIGQUERY_DATASET_ID")
     bq_global_sentiment_history_table: str = Field(
         alias="BIGQUERY_GLOBAL_SENTIMENT_HISTORY_TABLE"
+    )
+    retry: Retry = Retry(
+        initial=1.0,
+        maximum=30.0,
+        multiplier=2.0,
+        deadline=60.0,
     )
 
 

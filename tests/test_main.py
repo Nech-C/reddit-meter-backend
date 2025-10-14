@@ -144,7 +144,7 @@ def test_rate_limit(client):
 
     # 10 allowed
     for _ in range(
-        7
+        8
     ):  # TODO: limit gets triggered on the 8th call for some reason. fix this
         assert test_client.get("/sentiment/current", headers=headers).status_code == 200
     # 11th blocked

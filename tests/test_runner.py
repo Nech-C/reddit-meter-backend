@@ -41,6 +41,16 @@ class DummyBucket:
         )
 
 
+class DummyBQRepo:
+    def __init__(self) -> None:
+        self.inserts: list = []
+
+    def insert_global_sentiment_history(self, aggregated_sentiment):
+        # mirror BigQueryRepo API: return [] on success
+        self.inserts.append(aggregated_sentiment)
+        return []
+
+
 def _build_post(post_id: str, subreddit: str, score: int) -> Post:
     return Post(
         post_id=post_id,
@@ -89,6 +99,9 @@ def test_runner_main_full_pipeline(monkeypatch: pytest.MonkeyPatch) -> None:
 
     bucket = DummyBucket()
     monkeypatch.setattr(runner, "default_bucket_repo", lambda: bucket)
+
+    bq_repo = DummyBQRepo()
+    monkeypatch.setattr(runner, "default_bq_repo", lambda: bq_repo)
 
     monkeypatch.setenv("APP_ENV", "production")
 
@@ -146,6 +159,13 @@ def test_runner_main_full_pipeline(monkeypatch: pytest.MonkeyPatch) -> None:
         assert serialized["post_subreddit"] in {"python", "learnpython"}
         serialized_ts = serialized["processing_timestamp"].replace("Z", "+00:00")
         assert datetime.fromisoformat(serialized_ts) == posts[0].processing_timestamp
+
+    assert len(bq_repo.inserts) == 1
+    # You can assert it’s the same object passed to Firestore history,
+    # or at least the same top-level sentiment values.
+    inserted = bq_repo.inserts[0]
+    assert inserted.joy == repo.history_calls[0].joy
+    assert inserted.surprise == repo.history_calls[0].surprise
 
     # The runner should not mutate the predictions list that was supplied by the inference mock.
     assert predictions[0]["joy"] == pytest.approx(0.7)
