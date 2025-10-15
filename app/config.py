@@ -16,8 +16,8 @@ class AppSettings(BaseSettings):
     model_config = SettingsConfigDict(
         env_file=env_file, case_sensitive=True, extra="ignore"
     )
-    # declare so pydantic reads it from .env.test etc.
     GOOGLE_APPLICATION_CREDENTIALS: str | None = None
+    API_OUTPUT_SCHEMA: str = "legacy"  # "legacy" or "new"
 
 
 @lru_cache()

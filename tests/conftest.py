@@ -98,6 +98,7 @@ def _make_post(
     comment_count: int = 1,
     comments: list[PostComment] | None = None,
     sentiment: Sentiment | None = None,
+    contribution: float = 0,
 ) -> Post:
     """Helper to build a valid Post model instance for tests."""
     created_ts = created_ts or datetime(2025, 1, 2, 0, 0, tzinfo=timezone.utc)
@@ -119,6 +120,7 @@ def _make_post(
         post_comments=comments,
         post_subreddit=subreddit,
         sentiment=sentiment,
+        contribution=contribution,
     )
 
 
@@ -195,3 +197,180 @@ def client(monkeypatch):
         yield test_client, fake_repo
 
     main.app.dependency_overrides.clear()
+
+
+@pytest.fixture
+def legacy_output() -> dict:
+    return {
+        "sadness": 0.143517026257866,
+        "joy": 0.393270469837964,
+        "love": 0.0225529792857112,
+        "updatedAt": "2025-10-15T01:42:35.833000+00:00",
+        "surprise": 0.0339783017073778,
+        "fear": 0.084910188367739,
+        "anger": 0.321771034543342,
+        "timestamp": "2025-10-15T01:42:30.861835+00:00",
+        "_top_contributor": {
+            "surprise": [
+                {
+                    "processing_timestamp": "2025-10-15T01:42:19.868678Z",
+                    "created": "2025-10-14T18:46:20Z",
+                    "subreddit": "mildlyinteresting",
+                    "text": "",
+                    "contribution": 0.00273763368796457,
+                    "id": "1o6o1gc",
+                    "url": "https://reddit.com/r/mildlyinteresting/comments/1o6o1gc/arnold_advertising_a_cheap_drill_at_a_discount/",
+                    "sentiment_source_model": "bert",
+                    "title": "Arnold advertising a cheap drill at a discount store in Germany",
+                    "sentiment": {
+                        "surprise": 0.924781799316406,
+                        "sadness": 0.00484359031543136,
+                        "joy": 0.0575864464044571,
+                        "anger": 0.00688220653682947,
+                        "fear": 0.00384777830913663,
+                        "love": 0.00205818004906178,
+                    },
+                    "comments": [
+                        {
+                            "author": "crysal0",
+                            "created_utc": 1760467735,
+                            "score": 7076,
+                            "body": "They may be cheap but they are very decent, have had one for 4 years and no issues for the daily task",
+                        },
+                        {
+                            "author": "Aromatic_Fail_1722",
+                            "created_utc": 1760467733,
+                            "score": 2120,
+                            "body": "The same campaign runs here in Belgium (and Holland) too. Everyone's mighty impressed with how they managed to get Ahnold.",
+                        },
+                        {
+                            "author": "elferrydavid",
+                            "created_utc": 1760467987,
+                            "score": 969,
+                            "body": "Parkside superiority!",
+                        },
+                        {
+                            "author": "xondk",
+                            "created_utc": 1760468251,
+                            "score": 1012,
+                            "body": 'I get the idea behind saying it is "cheap" but parkside is generally decent quality, yeah nothing special, but there are a whole host of stuff that is a lot lot worse then parkside.',
+                        },
+                        {
+                            "author": "HugoZHackenbush2",
+                            "created_utc": 1760468106,
+                            "score": 436,
+                            "body": "If you want to buy the product, it's in Aisle B, back..",
+                        },
+                    ],
+                    "num_comments": 1339,
+                    "score": 18607,
+                },
+                {
+                    "processing_timestamp": "2025-10-15T01:42:19.868678Z",
+                    "created": "2025-10-14T00:43:34Z",
+                    "subreddit": "mildlyinteresting",
+                    "text": "",
+                    "contribution": 0.002565004365351,
+                    "id": "1o61e7t",
+                    "url": "https://reddit.com/r/mildlyinteresting/comments/1o61e7t/on_japans_bullet_train_the_mens_urinal_door_has_a/",
+                    "sentiment_source_model": "bert",
+                    "title": "On Japan's bullet train the men's urinal door has a see-through window...",
+                    "sentiment": {
+                        "surprise": 0.62286102771759,
+                        "sadness": 0.0019791501108557,
+                        "joy": 0.00202179607003927,
+                        "anger": 0.00161215313710272,
+                        "fear": 0.370436698198319,
+                        "love": 0.00108915090095252,
+                    },
+                    "comments": [
+                        {
+                            "author": "Latranis",
+                            "created_utc": 1760408553,
+                            "score": 4146,
+                            "body": "There's a mall in Santa Fe NM where there was apparently a rash of people having sex in the bathroom stalls. Their solution was to take all the doors off the stalls. You haven't had a weird day until you've made eye contact with three consecutive pooping men lined up in a row. In 2001, I had a weird day.",
+                        },
+                        {
+                            "author": "PapaOoMaoMao",
+                            "created_utc": 1760403505,
+                            "score": 6992,
+                            "body": "Went to a tourist bus stop bathroom in Toba. There was no door on the trough room. Anyone walking by could see everything. It was very weird.",
+                        },
+                        {
+                            "author": "froghumper66",
+                            "created_utc": 1760403097,
+                            "score": 5204,
+                            "body": "As long as you’re not one of those weirdo’s that pulls their pants down to piss in the urinal",
+                        },
+                        {
+                            "author": "senorbozz",
+                            "created_utc": 1760404371,
+                            "score": 2460,
+                            "body": "Those are made exclusively by the Swedish company ICUP.",
+                        },
+                        {
+                            "author": "Cptbeeeee",
+                            "created_utc": 1760407511,
+                            "score": 528,
+                            "body": "Don't worry. Your junk is always pixelated in japan",
+                        },
+                    ],
+                    "num_comments": 1214,
+                    "score": 30530,
+                },
+                {
+                    "processing_timestamp": "2025-10-15T01:42:19.868678Z",
+                    "created": "2025-10-14T11:54:55Z",
+                    "subreddit": "mildlyinteresting",
+                    "text": "",
+                    "contribution": 0.00168886274604596,
+                    "id": "1o6dfqh",
+                    "url": "https://reddit.com/r/mildlyinteresting/comments/1o6dfqh/found_asterix_obelix_when_i_removed_the_wallpaper/",
+                    "sentiment_source_model": "bert",
+                    "title": "Found Asterix & Obelix when I removed the wallpaper in our new house.",
+                    "sentiment": {
+                        "surprise": 0.945324659347534,
+                        "sadness": 0.00194967444986105,
+                        "joy": 0.00583886355161667,
+                        "anger": 0.00146260182373226,
+                        "fear": 0.0447047874331474,
+                        "love": 0.000719399598892778,
+                    },
+                    "comments": [
+                        {
+                            "author": "S_Maja_",
+                            "created_utc": 1760444512,
+                            "score": 1096,
+                            "body": "I've never wanted to steal a wall until now",
+                        },
+                        {
+                            "author": "icantbearsed",
+                            "created_utc": 1760443052,
+                            "score": 440,
+                            "body": "Now you Gettafix it!",
+                        },
+                        {
+                            "author": "archaeo_rex",
+                            "created_utc": 1760445619,
+                            "score": 251,
+                            "body": 'Weird choice to have Goths there, from "Asterix and the Goths"\n\nEven found the exact page where the four Germanics were taken from\n\n[https://dn790008.ca.archive.org/0/items/Asterixcompleteset/Asterix/03-%20Asterix%20and%20the%20Goths.pdf#page=21&zoom=250,-29,18](https://dn790008.ca.archive.org/0/items/Asterixcompleteset/Asterix/03-%20Asterix%20and%20the%20Goths.pdf#page=21&zoom=250,-29,18)',
+                        },
+                        {
+                            "author": "lkap28",
+                            "created_utc": 1760447106,
+                            "score": 118,
+                            "body": "It is my dream to remove wallpaper and find something amazing underneath!! I always make a point of doodling on walls before I cover them up, so I can at least pass that moment on to someone. Is there a date? :)",
+                        },
+                        {
+                            "author": "Muffinshire",
+                            "created_utc": 1760447731,
+                            "score": 29,
+                            "body": "By Toutatis!",
+                        },
+                    ],
+                    "num_comments": 106,
+                    "score": 8723,
+                },
+            ],
+        },
+    }

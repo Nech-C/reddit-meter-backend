@@ -13,6 +13,7 @@ Note: These tests mock the Firestore client. They do not require a real GCP proj
 """
 
 import pytest
+import types
 from datetime import datetime
 from unittest.mock import MagicMock
 
@@ -175,17 +176,19 @@ def test_save_sentiment_history_failure_logs(
 # ---------------------------
 
 
-def test_get_latest_sentiment_success(firestore_repo, mock_db):
+def test_get_latest_sentiment_success(firestore_repo, mock_db, sample_summary):
     """
     When a latest doc exists, return its dict payload.
     """
     fake_doc = MagicMock()
     fake_doc.exists = True
-    fake_doc.to_dict.return_value = {"joy": 0.7}
+    fake_doc.to_dict.return_value = sample_summary.model_dump(
+        mode="json", exclude_none=False
+    )
     mock_db.collection.return_value.document.return_value.get.return_value = fake_doc
 
     result = firestore_repo.get_latest_sentiment()
-    assert result == {"joy": 0.7}
+    assert result == sample_summary.model_dump(mode="json", exclude_none=False)
 
 
 def test_get_latest_sentiment_no_data(firestore_repo, mock_db):
@@ -220,22 +223,25 @@ def test_get_latest_sentiment_failure(firestore_repo, mock_db, caplog):
 # ---------------------------
 
 
-def test_get_recent_sentiment_history_success(firestore_repo, mock_db):
+def test_get_recent_sentiment_history_success(firestore_repo, mock_db, sample_summary):
     """
     Recent history query should stream documents and return their dicts
     in the same order as Firestore yields them.
     """
     fake_doc1 = MagicMock()
-    fake_doc1.to_dict.return_value = {"joy": 0.1}
+    fake_doc1.to_dict.return_value = sample_summary.model_dump(mode="json")
     fake_doc2 = MagicMock()
-    fake_doc2.to_dict.return_value = {"joy": 0.2}
+    fake_doc2.to_dict.return_value = sample_summary.model_dump(mode="json")
 
     # Simulate query chain where()->order_by()->limit()->stream()
     q = mock_db.collection.return_value.where.return_value
     q.stream.return_value = [fake_doc1, fake_doc2]
 
     results = firestore_repo.get_recent_sentiment_history(7)
-    assert results == [{"joy": 0.1}, {"joy": 0.2}]
+    assert results == [
+        sample_summary.model_dump(mode="json"),
+        sample_summary.model_dump(mode="json"),
+    ]
 
     # Verify query composition calls were made (defensive regression check)
     mock_db.collection.return_value.where.assert_called()
@@ -275,3 +281,26 @@ def test_healthcheck_failure_raises(firestore_repo, mock_db):
 
     with pytest.raises(RuntimeError):
         firestore_repo.healthcheck()
+
+
+def test_get_recent_sentiment_history_success_legacy_schema(
+    firestore_repo, mock_db, legacy_output
+):
+    """
+    When API_OUTPUT_SCHEMA is 'legacy' and Firestore stores an old-style document,
+    get_latest_sentiment() should return that legacy dict unchanged.
+    """
+    # --- patch FirestoreRepo.app_settings for this test only ---
+    import app.storage.firestore as fs
+
+    fs.app_settings = types.SimpleNamespace(API_OUTPUT_SCHEMA="legacy")
+
+    # --- mock Firestore document ---
+    fake_doc = MagicMock()
+    fake_doc.exists = True
+    fake_doc.to_dict.return_value = legacy_output
+    mock_db.collection.return_value.document.return_value.get.return_value = fake_doc
+
+    # --- call and verify ---
+    result = firestore_repo.get_latest_sentiment()
+    assert legacy_output == result

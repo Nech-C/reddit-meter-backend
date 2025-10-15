@@ -73,4 +73,4 @@ install_dep_kaggle:
 	pip install requirements/annot.txt
 
 test:
-	PYTHONPATH=. APP_ENV=test uv run pytest --cov=app --cov-report=term-missing
+	PYTHONPATH=. APP_ENV=test uv run pytest --cov=app --cov-report=term-missing -vv

@@ -193,6 +193,8 @@ class SentimentSummary(BaseModel):
     surprise: Probability = 0.0
 
     top_contributors: List[TopSentimentContributor]
+    updatedAt: Optional[str] = None
+    timestamp: Optional[str] = None
 
     def to_bq_dict(self):
         dump = self.model_dump(
