@@ -208,7 +208,7 @@ Other notable artifacts:
 - `requirements/*.txt` – ready-to-install requirements snapshots for App Engine builds
 - `Dockerfile.*` – container blueprints for both the API and pipeline stacks
 
-## Engineering Practices Recruiters Care About
+## Engineering Practices
 - **Quality & Testing**: Run `pytest` via `make test` for the pipeline and API. Linting is enforced with `ruff`, formatting with
   `black`, and type hints are used across the codebase.
 - **Observability Ready**: Structured logging is implemented in the jobs and API to plug into Stackdriver or any JSON log collector.
@@ -216,8 +216,6 @@ Other notable artifacts:
   runtime via secret managers.
 - **Scalability**: Pipeline supports batch sizes and concurrency tuning through environment variables. API is stateless and ready
   for horizontal scaling on Cloud Run or similar platforms, and currently runs on Google App Engine standard.
-- **Product Impact**: Aggregated sentiment trends have been used in interviews to discuss community health monitoring and content
-  strategy insights.
 
 ## Roadmap & Future Enhancements
 - Extend ML model to detect sarcasm and toxicity for richer sentiment analysis.
@@ -231,8 +229,7 @@ Other notable artifacts:
   completions back through Cloud Storage.
 - **GCS coordination**: Intermediate artifacts (claim checks, prompt shards, completion payloads) live under a shared GCS prefix so
   you can mix-and-match compute from different notebooks without race conditions.
-- **BigQuery landing zone**: Curated exports from Cloud Storage are mirrored into BigQuery for long-term analytics, making it
-  easy to validate model drift or demo SQL storytelling to recruiters.
+
 
 ## Contributing & Local Tooling
 ```bash
