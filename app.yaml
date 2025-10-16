@@ -13,7 +13,7 @@ env_variables:
   FIRESTORE_SENTIMENT_HISTORY_COLLECTION_NAME: sentiment_history
   FIRESTORE_CURRENT_SENTIMENT_COLLECTION_NAME: current_sentiment
   APP_ENV: dev
-  GOOGLE_BUCKET_NAME: reddit-sentiment-archive
+  FIRESTORE_GOOGLE_BUCKET_NAME: reddit-sentiment-archive
 
 service_account: reddit-sentiment-meter@appspot.gserviceaccount.com
 
