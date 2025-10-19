@@ -1,7 +1,7 @@
 # app/models/post.py
 """Typed representations of Reddit posts, comments and sentiment scores."""
 
-from typing import Optional, List, Annotated, Any
+from typing import Optional, List, Annotated, Any, Union
 from datetime import datetime
 import math
 
@@ -193,8 +193,8 @@ class SentimentSummary(BaseModel):
     surprise: Probability = 0.0
 
     top_contributors: List[TopSentimentContributor]
-    updatedAt: Optional[str] = None
-    timestamp: Optional[str] = None
+    updatedAt: Optional[Union[str, datetime]] = Field(default=None, union_mode="smart")
+    timestamp: Optional[Union[str, datetime]] = Field(default=None, union_mode="smart")
 
     def to_bq_dict(self):
         dump = self.model_dump(
