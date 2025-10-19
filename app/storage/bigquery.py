@@ -89,7 +89,6 @@ class BigQueryRepo:
             "SELECT * "
             f"FROM `{self.s.bq_dataset}.{self.s.bq_global_sentiment_history_table}` "
             "WHERE DATE(timestamp) BETWEEN @start_date AND @end_date "
-            "ORDER BY timestamp ASC "
             f"LIMIT {self.s.bq_global_sentiment_history_limit};"
         )
 
