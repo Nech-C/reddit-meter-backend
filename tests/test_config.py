@@ -8,10 +8,12 @@ def clear_caches():
     config.get_annotation_worker_settings.cache_clear()
     config.get_storage_settings.cache_clear()
     config.get_inference_settings.cache_clear()
+    config.get_bigquery_settings.cache_clear()
     yield
     config.get_annotation_worker_settings.cache_clear()
     config.get_storage_settings.cache_clear()
     config.get_inference_settings.cache_clear()
+    config.get_bigquery_settings.cache_clear()
 
 
 def test_get_annotation_worker_settings_reads_env(monkeypatch):
@@ -74,3 +76,12 @@ def test_get_inference_settings(monkeypatch):
 
     monkeypatch.setenv("SENTIMENT_MODEL_ID", "other")
     assert config.get_inference_settings().SENTIMENT_MODEL_ID == "custom-model"
+
+
+def test_bq_settings():
+    """Ensure BigQuerySettings work properly"""
+    # all properties are available
+    settings = config.BigQuerySettings()
+
+    assert settings.bq_dataset is not None
+    assert settings.bq_global_sentiment_history_table is not None

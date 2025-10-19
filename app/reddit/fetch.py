@@ -143,7 +143,7 @@ class RedditFetcher:
                 log.debug(
                     "Processing submission %s - %s", submission.id, submission.title
                 )
-                submission.comments.replace_more(limit=5)
+                submission.comments.replace_more(limit=5)  # TODO: make it a constant
 
                 valid_comments: list[PostComment] = []
                 for comment in submission.comments:
@@ -151,6 +151,8 @@ class RedditFetcher:
                         continue
                     if comment.author == "AutoModerator":
                         continue
+                    created_utc = getattr(comment, "created_utc", None)
+                    created_utc = created_utc if created_utc is not None else 0
                     valid_comments.append(
                         PostComment(
                             body=comment.body,
@@ -160,7 +162,7 @@ class RedditFetcher:
                                 else constants.DEFAULT_COMMENT_AUTHOR_PLACEHOLDER
                             ),
                             score=max(comment.score or 0, 0),
-                            created_utc=getattr(comment, "created_utc", None),
+                            created_utc=datetime.fromtimestamp(created_utc),
                         )
                     )
                     if len(valid_comments) >= comment_limit:

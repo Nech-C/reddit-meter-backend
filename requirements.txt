@@ -4,3 +4,5 @@ google-cloud-firestore
 python-dotenv
 slowapi
 secure
+pydantic
+google-cloud-bigquery

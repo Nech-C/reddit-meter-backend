@@ -18,12 +18,17 @@ def test_PostComment_success():
 
     # all fields
     comment2 = post.PostComment.model_validate(
-        {"body": "hello!", "author": "me", "score": 100, "created_utc": 123345}
+        {
+            "body": "hello!",
+            "author": "me",
+            "score": 100,
+            "created_utc": datetime.fromtimestamp(123345),
+        }
     )
     assert comment2.body == "hello!"
     assert comment2.author == "me"
     assert comment2.score == 100
-    assert comment2.created_utc == 123345
+    assert comment2.created_utc == datetime.fromtimestamp(123345)
 
 
 def test_postcomment_failure():

@@ -1,7 +1,7 @@
 # app/models/post.py
 """Typed representations of Reddit posts, comments and sentiment scores."""
 
-from typing import Optional, List, Annotated, Any
+from typing import Optional, List, Annotated, Any, Union
 from datetime import datetime
 import math
 
@@ -11,7 +11,6 @@ from pydantic import (
     field_validator,
     model_validator,
     ConfigDict,
-    HttpUrl,
 )
 
 import app.constants as constants
@@ -28,7 +27,7 @@ class PostComment(BaseModel):
     author: Optional[str] = None
     # Reddit returns non-negative scores; enforce to guard against invalid data.
     score: OptNonNegativeInt = None
-    created_utc: Optional[float] = None  # unix seconds
+    created_utc: Optional[datetime] = None  # unix seconds
 
     model_config = ConfigDict(extra="ignore")
 
@@ -68,23 +67,24 @@ class Post(BaseModel):
 
     # Source fields set by the Reddit API fetcher.
     post_id: Optional[str] = Field(default=None, alias="id")
-    post_url: Optional[HttpUrl] = Field(default=None, alias="url")
+    post_url: Optional[str] = Field(default=None, alias="url")
     post_title: Optional[str] = Field(default=None, alias="title")
     post_text: Optional[str] = Field(default=None, alias="text")
+    post_text_preview: Optional[str] = None
     # Prefer aware datetimes for easier downstream processing.
     post_created_ts: Optional[datetime] = Field(default=None, alias="created")
+    # TODO: migrate to post_created_ts
+    # make sure both frontend and backend compatibility
+    # make sure the right format is used for all storage: bigquery, firestore, and gcs
+    post_score: Optional[int] = Field(default=None, alias="score")
 
-    score: Optional[int] = None
-
-    post_comment_count: OptNonNegativeInt = Field(
-        default=None, alias="num_comments"
-    )
+    post_comment_count: OptNonNegativeInt = Field(default=None, alias="num_comments")
     post_comments: List[PostComment] = Field(default_factory=list, alias="comments")
 
     post_subreddit: Optional[str] = Field(default=None, alias="subreddit")
 
     # Generated / processing metadata.
-    contribution: OptNonNegativeInt = None
+    contribution: float = None
     sentiment: Optional[Sentiment] = None
     processing_timestamp: Optional[datetime] = Field(
         default_factory=lambda: datetime.now(constants.TIMEZONE)
@@ -138,9 +138,69 @@ class Post(BaseModel):
     def to_json_dict(self) -> dict:
         """Return a JSON-serialisable dictionary representation of the post."""
 
-        return self.model_dump(mode="json", by_alias=True, exclude_none=True)
+        return self.model_dump(mode="json", exclude_none=True)
 
     def to_python_dict(self) -> dict:
         """Return a Python-native dictionary suitable for Firestore writes."""
 
-        return self.model_dump(mode="python", by_alias=True, exclude_none=True)
+        return self.model_dump(mode="python", exclude_none=True)
+
+    def to_bq_dict(self, preview_length_limit=constants.DEFAULT_BQ_TEXT_PREVIEW_MAX):
+        """
+        Return a BigQuery-ready dict version of this Post.
+
+        - Keeps all fields except post_text.
+        - Adds post_text_preview (truncated).
+        - Omits None fields for cleaner insert payloads.
+        """
+        dump = self.model_dump(mode="json", exclude_none=True)
+
+        full_text = dump.get("post_text")
+        if full_text:
+            dump["post_text_preview"] = full_text[:preview_length_limit]
+        else:
+            dump["post_text_preview"] = None
+
+        # Remove full text to avoid uploading big blobs to BigQuery
+        dump.pop("post_text", None)
+
+        return dump
+
+
+class TopSentimentContributor(BaseModel):
+    """Validated top contributors for a single sentiment"""
+
+    model_config = ConfigDict(extra="ignore")
+    emotion: str
+    top_posts: List[Post]
+
+    def to_bq_dict(self):
+        dump = self.model_dump(mode="json", exclude_none=True, exclude={"top_posts"})
+        dump["top_posts"] = list(map(Post.to_bq_dict, self.top_posts))
+        return dump
+
+
+class SentimentSummary(BaseModel):
+    """Validated sentiment summary for Firestore and BigQuery"""
+
+    model_config = ConfigDict(extra="ignore")
+
+    joy: Probability = 0.0
+    sadness: Probability = 0.0
+    anger: Probability = 0.0
+    fear: Probability = 0.0
+    love: Probability = 0.0
+    surprise: Probability = 0.0
+
+    top_contributors: List[TopSentimentContributor]
+    updatedAt: Optional[Union[datetime, str]] = Field(default=None, union_mode="smart")
+    timestamp: Optional[Union[datetime, str]] = Field(default=None, union_mode="smart")
+
+    def to_bq_dict(self):
+        dump = self.model_dump(
+            mode="json", exclude_none=True, exclude={"top_contributors"}
+        )
+        dump["top_contributors"] = list(
+            map(TopSentimentContributor.to_bq_dict, self.top_contributors)
+        )
+        return dump

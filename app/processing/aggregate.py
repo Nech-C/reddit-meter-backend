@@ -7,7 +7,7 @@ from typing import Iterable
 
 import numpy as np
 
-from app.models.post import Post
+from app.models.post import Post, SentimentSummary
 
 
 def normalized_softmax(x: np.ndarray, temperature: int) -> np.ndarray:
@@ -25,7 +25,7 @@ def _ensure_post(post_data: Post | dict) -> Post:
     return Post.model_validate(post_data)
 
 
-def compute_sentiment_average(posts: Iterable[Post | dict]) -> dict:
+def compute_sentiment_average(posts: Iterable[Post | dict]) -> SentimentSummary:
     """
     Aggregates sentiment scores across all posts.
 
@@ -38,7 +38,9 @@ def compute_sentiment_average(posts: Iterable[Post | dict]) -> dict:
     """
     validated_posts = [_ensure_post(p) for p in posts]
     valid_posts = [
-        p for p in validated_posts if p.sentiment is not None and p.score is not None
+        p
+        for p in validated_posts
+        if p.sentiment is not None and p.post_score is not None
     ]
     if not valid_posts:
         return {}
@@ -47,9 +49,9 @@ def compute_sentiment_average(posts: Iterable[Post | dict]) -> dict:
     temperature = 1.5  # Try tuning between 100–5000
 
     filtered = [
-        (i, max(p.score or 0, 0))
+        (i, max(p.post_score or 0, 0))
         for i, p in enumerate(valid_posts)
-        if (p.score or 0) > 0
+        if (p.post_score or 0) > 0
     ]
     if not filtered:
         return {}
@@ -78,17 +80,21 @@ def compute_sentiment_average(posts: Iterable[Post | dict]) -> dict:
         return {label: 0 for label in weighted_totals}
 
     averages = {label: val / total for label, val in weighted_totals.items()}
-
-    return {
-        **averages,
-        "_top_contributor": {
-            emotion: [
+    return SentimentSummary.model_validate(
+        {
+            **averages,
+            "top_contributors": [
                 {
-                    **post.to_json_dict(),
-                    "contribution": contrib,
+                    "emotion": emotion,
+                    "top_posts": [
+                        {
+                            **post.to_python_dict(),
+                            "contribution": contrib,
+                        }
+                        for contrib, _, post in sorted(entries, reverse=True)
+                    ],
                 }
-                for contrib, _, post in sorted(entries, reverse=True)
-            ]
-            for emotion, entries in top_contributors.items()
-        },
-    }
+                for emotion, entries in top_contributors.items()
+            ],
+        }
+    )

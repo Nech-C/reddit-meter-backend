@@ -3,6 +3,8 @@ import os
 from functools import lru_cache
 from pathlib import Path
 
+
+from google.api_core.retry import Retry
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -14,8 +16,8 @@ class AppSettings(BaseSettings):
     model_config = SettingsConfigDict(
         env_file=env_file, case_sensitive=True, extra="ignore"
     )
-    # declare so pydantic reads it from .env.test etc.
     GOOGLE_APPLICATION_CREDENTIALS: str | None = None
+    API_OUTPUT_SCHEMA: str = "legacy"  # "legacy" or "new"
 
 
 @lru_cache()
@@ -197,3 +199,31 @@ def get_reddit_settings() -> RedditSettings:
     """Return cached Reddit API settings."""
 
     return RedditSettings()
+
+
+class BigQuerySettings(BaseSettings):
+    """Settings for BigQuery"""
+
+    model_config = SettingsConfigDict(
+        env_file=env_file,
+        case_sensitive=True,
+        env_prefix="",
+        extra="ignore",
+    )
+    bq_dataset: str = Field(alias="BIGQUERY_DATASET_ID")
+    bq_global_sentiment_history_table: str = Field(
+        alias="BIGQUERY_GLOBAL_SENTIMENT_HISTORY_TABLE"
+    )
+    bq_global_sentiment_history_limit: int = 100
+    retry: Retry = Retry(
+        initial=1.0,
+        maximum=30.0,
+        multiplier=2.0,
+        deadline=60.0,
+    )
+
+
+@lru_cache(maxsize=1)
+def get_bigquery_settings() -> BigQuerySettings:
+    """return cached BigQuery settings"""
+    return BigQuerySettings()
