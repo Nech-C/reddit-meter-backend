@@ -214,6 +214,7 @@ class BigQuerySettings(BaseSettings):
     bq_global_sentiment_history_table: str = Field(
         alias="BIGQUERY_GLOBAL_SENTIMENT_HISTORY_TABLE"
     )
+    bq_global_sentiment_history_limit: int = 100
     retry: Retry = Retry(
         initial=1.0,
         maximum=30.0,

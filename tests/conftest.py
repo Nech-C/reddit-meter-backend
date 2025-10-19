@@ -14,6 +14,7 @@ from unittest.mock import MagicMock
 from datetime import datetime, timezone, timedelta
 
 from app.storage.firestore import FirestoreRepo
+from app.storage.bigquery import BigQueryRepo
 from app.api import main
 from app.models.post import (
     Post,
@@ -22,11 +23,26 @@ from app.models.post import (
     TopSentimentContributor,
     SentimentSummary,
 )
+from app.constants import TIMEZONE
 
 
 # ---------------------------
 # Settings & DB Mocks
 # ---------------------------
+def get_constant_datetime_fn():
+    fixed = datetime(2025, 10, 19, 12, 0, 0, tzinfo=TIMEZONE)
+
+    def _constant_datetime_fn(tz=None):
+        if tz is not None:
+            return fixed.astimezone(tz)
+        return fixed
+
+    return _constant_datetime_fn
+
+
+@pytest.fixture
+def get_constant_datetime():
+    return get_constant_datetime_fn()()
 
 
 class DummyStorageSettings:
@@ -66,6 +82,35 @@ def mock_db():
 def firestore_repo(mock_db):
     """FirestoreRepo wired to the mocked client and dummy settings."""
     return FirestoreRepo(settings=DummyStorageSettings(), db=mock_db)
+
+
+class DummyBigQuerySettings:
+    bq_dataset = "sentiment_dataset"
+    bq_global_sentiment_history_table = "sentiment_table"
+    bq_global_sentiment_history_limit = "sentiemnt_limit"
+    retry = "sentiment_retry"
+
+
+@pytest.fixture
+def mock_bq_client():
+    client = MagicMock(name="bigquery.client")
+
+    job = MagicMock(name="QueryJob")
+    client.query.return_value = job
+
+    results = MagicMock(name="RowIterator")
+    job.results.return_value = results
+
+    return client
+
+
+@pytest.fixture
+def bigquery_repo(mock_bq_client):
+    return BigQueryRepo(
+        settings=DummyBigQuerySettings,
+        client=mock_bq_client,
+        now_fn=get_constant_datetime_fn(),
+    )
 
 
 @pytest.fixture
@@ -205,11 +250,11 @@ def legacy_output() -> dict:
         "sadness": 0.143517026257866,
         "joy": 0.393270469837964,
         "love": 0.0225529792857112,
-        "updatedAt": "2025-10-15T01:42:35.833000+00:00",
+        "updatedAt": datetime.fromisoformat("2025-10-15T01:42:35.833000+00:00"),
         "surprise": 0.0339783017073778,
         "fear": 0.084910188367739,
         "anger": 0.321771034543342,
-        "timestamp": "2025-10-15T01:42:30.861835+00:00",
+        "timestamp": datetime.fromisoformat("2025-10-15T01:42:30.861835+00:00"),
         "_top_contributor": {
             "surprise": [
                 {
