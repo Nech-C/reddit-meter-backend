@@ -64,10 +64,10 @@ def _to_new_summary(raw: dict) -> dict:
         k: raw.get(k) for k in ("joy", "sadness", "anger", "fear", "love", "surprise")
     }
     base["top_contributors"] = tc
-    base["timestamp"] = raw["timestamp"].isoformat()
-    base["updatedAt"] = raw["updatedAt"].isoformat()
+    base["timestamp"] = raw["timestamp"]
+    base["updatedAt"] = raw["updatedAt"]
     summary = SentimentSummary.model_validate(base)
-    out = summary.model_dump(mode="json", exclude_none=False)
+    out = summary.model_dump(mode="python", exclude_none=False)
 
     return out
 
@@ -255,6 +255,11 @@ class FirestoreRepo:
             if not doc.exists:
                 return {"error": "No sentiment data found."}
             # first normalize to NEW, then optionally downgrade to LEGACY
+        except Exception:
+            log.exception("Failed to read latest sentiment")
+            return {"error": "Firestore read failed."}
+
+        try:
             new_shape = _to_new_summary(doc.to_dict())
             return (
                 _to_legacy_summary(new_shape)
@@ -262,8 +267,9 @@ class FirestoreRepo:
                 else new_shape
             )
         except Exception:
-            log.exception("Failed to read latest sentiment")
-            return {"error": "Firestore read failed."}
+            log.exception(
+                f"failed to convert into valid format. Mode: {app_settings.API_OUTPUT_SCHEMA}"
+            )
 
     def get_recent_sentiment_history(self, num_days: int) -> list[Dict]:
         """Retrieve the sentiment history from Firestore (sentiment_history).

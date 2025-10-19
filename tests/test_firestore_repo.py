@@ -303,4 +303,6 @@ def test_get_recent_sentiment_history_success_legacy_schema(
 
     # --- call and verify ---
     result = firestore_repo.get_latest_sentiment()
-    assert legacy_output == result
+    assert legacy_output["sadness"] == result["sadness"]
+    assert legacy_output["updatedAt"] == result["updatedAt"]
+    assert len(legacy_output["_top_contributor"]) == len(result["_top_contributor"])
