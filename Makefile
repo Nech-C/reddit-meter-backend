@@ -72,5 +72,8 @@ install_dep_kaggle:
 	pip install -U bitsandbytes
 	pip install requirements/annot.txt
 
-test:
+test-v:
 	PYTHONPATH=. APP_ENV=test uv run pytest --cov=app --cov-report=term-missing -vv
+
+test:
+	PYTHONPATH=. APP_ENV=test uv run pytest --cov=app --cov-report=term-missing
