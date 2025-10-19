@@ -17,6 +17,7 @@ env_variables:
   BIGQUERY_DATASET_ID: sentiment
   BIGQUERY_GLOBAL_SENTIMENT_HISTORY_TABLE: global_sentiment_history
 
+
 service_account: reddit-sentiment-meter@appspot.gserviceaccount.com
 
 automatic_scaling:

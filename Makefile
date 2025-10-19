@@ -77,3 +77,6 @@ test-v:
 
 test:
 	PYTHONPATH=. APP_ENV=test uv run pytest --cov=app --cov-report=term-missing
+
+deploy_appengine:
+	gcloud app deploy
