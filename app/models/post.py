@@ -193,8 +193,8 @@ class SentimentSummary(BaseModel):
     surprise: Probability = 0.0
 
     top_contributors: List[TopSentimentContributor]
-    updatedAt: Optional[Union[str, datetime]] = Field(default=None, union_mode="smart")
-    timestamp: Optional[Union[str, datetime]] = Field(default=None, union_mode="smart")
+    updatedAt: Optional[Union[datetime, str]] = Field(default=None, union_mode="smart")
+    timestamp: Optional[Union[datetime, str]] = Field(default=None, union_mode="smart")
 
     def to_bq_dict(self):
         dump = self.model_dump(
